@@ -1,0 +1,2624 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conciliação Contábil — Protheus / Domínio</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg:#f5f4f0;--surface:#fff;--surface2:#f9f8f5;--border:#e2e0d8;--border2:#ccc9be;
+  --text:#1a1916;--text2:#5a5852;--text3:#8a877e;
+  --accent:#1a5c3a;--accent2:#2d8a5a;--accent-bg:#e8f5ee;
+  --warn:#8a4a00;--warn-bg:#fef3e2;
+  --danger:#8a1a1a;--danger-bg:#fde8e8;
+  --info:#1a3a8a;--info-bg:#e8eefe;
+  --ret:#6b3fa0;--ret-bg:#f0eafa;
+  --font:'Trebuchet MS',Trebuchet,Arial,sans-serif;--mono:'Courier New',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.6;}
+header{background:var(--accent);color:white;padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:56px;border-bottom:3px solid #0f3d27;}
+header h1{font-size:15px;font-weight:normal;letter-spacing:.08em;text-transform:uppercase;}
+header .ver{font-size:11px;opacity:.6;letter-spacing:.04em;}
+.sys-sel-bar{background:#0f3d27;border-bottom:2px solid #07261a;padding:7px 2rem;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.sys-sel-bar label{font-size:11px;color:rgba(255,255,255,.6);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;}
+.sys-btn{padding:5px 14px;border:1px solid rgba(255,255,255,.25);border-radius:4px;background:transparent;color:rgba(255,255,255,.6);font-size:11px;font-family:var(--font);cursor:pointer;letter-spacing:.04em;transition:all .15s;white-space:nowrap;}
+.sys-btn:hover{border-color:rgba(255,255,255,.5);color:#fff;}
+.sys-btn.active{background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.6);font-weight:bold;}
+.sys-badge{font-size:10px;padding:2px 8px;border-radius:3px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.5);font-family:var(--mono);margin-left:8px;}
+
+.layout{display:flex;height:calc(100vh - 56px);overflow:hidden;}
+
+.sidebar{width:272px;min-width:272px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.ss{padding:.9rem;border-bottom:1px solid var(--border);}
+.slbl{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:.5rem;}
+.upload-zone{border:1.5px dashed var(--border2);border-radius:6px;padding:1.1rem;text-align:center;cursor:pointer;background:var(--surface2);transition:border-color .2s,background .2s;}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent2);background:var(--accent-bg);}
+.upload-zone .icon{font-size:20px;margin-bottom:5px;display:block;}
+.upload-zone p{font-size:12px;color:var(--text2);}
+.upload-zone strong{color:var(--accent);}
+#file-input{display:none;}
+.fg{margin-bottom:.65rem;}
+.fg label{display:block;font-size:11px;color:var(--text2);margin-bottom:3px;}
+select,input[type=text],input[type=date],input[type=number]{width:100%;padding:5px 7px;border:1px solid var(--border2);border-radius:4px;background:var(--surface);color:var(--text);font-family:var(--font);font-size:12px;outline:none;}
+select:focus,input:focus{border-color:var(--accent2);box-shadow:0 0 0 2px rgba(45,138,90,.15);}
+.btn{display:block;width:100%;padding:7px 12px;background:var(--accent);color:white;border:none;border-radius:4px;font-family:var(--font);font-size:12px;letter-spacing:.05em;cursor:pointer;text-transform:uppercase;transition:background .15s;margin-top:5px;}
+.btn:hover{background:#0f3d27;}
+.btn-o{background:transparent;border:1px solid var(--accent);color:var(--accent);}
+.btn-o:hover{background:var(--accent-bg);}
+.acc-list{flex:1;overflow-y:auto;padding:.4rem 0;}
+.acc-item{padding:7px .9rem;cursor:pointer;border-left:3px solid transparent;transition:background .1s;font-size:12px;}
+.acc-item:hover{background:var(--surface2);}
+.acc-item.active{border-left-color:var(--accent);background:var(--accent-bg);}
+.acc-code{font-family:var(--mono);font-size:10px;color:var(--text3);display:block;}
+.acc-name{color:var(--text);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.acc-bdg{display:inline-block;font-size:10px;padding:1px 5px;border-radius:3px;margin-top:2px;}
+.bdg-open{background:var(--danger-bg);color:var(--danger);}
+.bdg-ok{background:var(--accent-bg);color:var(--accent);}
+
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+
+/* TOP FILTER BAR */
+.tfbar{background:var(--surface);border-bottom:2px solid var(--accent);padding:9px 1.4rem;display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;flex-shrink:0;}
+.tfg{display:flex;flex-direction:column;gap:3px;}
+.tfg label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);}
+.tfg select,.tfg input{height:33px;font-size:12px;padding:0 7px;}
+.tf-conta{min-width:250px;max-width:320px;}
+.tf-tipo{min-width:185px;}
+.tf-date{width:132px;}
+.tf-filial{width:85px;}
+.tf-sep{font-size:12px;color:var(--text3);padding-bottom:7px;}
+.tf-btns{display:flex;gap:6px;align-items:flex-end;margin-left:auto;}
+.tfbtn{height:33px;padding:0 14px;border:none;border-radius:4px;font-size:12px;font-family:var(--font);cursor:pointer;white-space:nowrap;transition:background .15s;}
+.tfbtn.apply{background:var(--accent);color:white;}
+.tfbtn.apply:hover{background:#0f3d27;}
+.tfbtn.clear{background:var(--surface2);color:var(--text2);border:1px solid var(--border2);}
+.tfbtn.clear:hover{background:var(--border);}
+
+/* SALDO ABERTURA */
+.saldo-bar{background:#fffbf0;border-bottom:1px solid #e8d88a;padding:7px 1.4rem;display:flex;align-items:center;gap:14px;flex-wrap:wrap;flex-shrink:0;}
+.saldo-bar label{font-size:11px;color:var(--warn);white-space:nowrap;font-weight:bold;}
+.saldo-bar input[type=number]{width:155px;height:29px;font-size:12px;padding:0 8px;border:1px solid #c8a800;border-radius:4px;font-family:var(--mono);}
+.saldo-bar .sbtn{height:29px;padding:0 12px;background:var(--warn);color:white;border:none;border-radius:4px;font-size:11px;font-family:var(--font);cursor:pointer;}
+.saldo-bar .sbtn:hover{background:#6a3800;}
+.saldo-badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:4px;background:var(--warn-bg);border:1px solid #e8d88a;font-size:12px;font-family:var(--mono);color:var(--warn);}
+.saldo-badge .rm{cursor:pointer;opacity:.6;margin-left:4px;font-size:13px;}
+.saldo-badge .rm:hover{opacity:1;}
+.saldo-hint{font-size:11px;color:var(--text3);}
+
+/* TAGS */
+.tags-row{display:flex;gap:6px;flex-wrap:wrap;padding:5px 1.4rem;background:var(--accent-bg);border-bottom:1px solid rgba(45,138,90,.2);min-height:32px;align-items:center;}
+.tags-row.hidden{display:none;}
+.atag{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:12px;background:var(--accent-bg);color:var(--accent);font-size:11px;border:1px solid rgba(45,138,90,.3);}
+.atag .rm{cursor:pointer;font-size:13px;line-height:1;opacity:.6;}
+.atag .rm:hover{opacity:1;}
+
+/* METRICS */
+.metrics{display:flex;padding:.65rem 1.4rem;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;gap:0;}
+.metric{flex:1;padding:0 .9rem;border-right:1px solid var(--border);}
+.metric:first-child{padding-left:0;}
+.metric:last-child{border-right:none;}
+.mlbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;display:block;}
+.mval{font-size:16px;font-family:var(--mono);display:block;margin-top:1px;}
+.mval.danger{color:var(--danger);}
+.mval.success{color:var(--accent);}
+.mval.warn{color:var(--warn);}
+.mval.ret{color:var(--ret);}
+
+/* TABS */
+.ptabs{display:flex;border-bottom:1px solid var(--border);padding:0 1.4rem;background:var(--surface);flex-shrink:0;}
+.ptab{padding:9px 14px;font-size:12px;border:none;border-bottom:2px solid transparent;background:transparent;cursor:pointer;color:var(--text2);font-family:var(--font);transition:color .1s;margin-bottom:-1px;}
+.ptab:hover{color:var(--text);}
+.ptab.active{border-bottom-color:var(--accent);color:var(--accent);}
+
+/* FILTER CHIPS */
+.frow{display:flex;gap:7px;align-items:center;padding:.45rem 1.4rem;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap;flex-shrink:0;}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border:1px solid var(--border2);border-radius:12px;font-size:11px;color:var(--text2);background:var(--surface);cursor:pointer;transition:all .1s;white-space:nowrap;}
+.chip.active{background:var(--accent);color:white;border-color:var(--accent);}
+.chip.ret-c.active{background:var(--ret);border-color:var(--ret);}
+.chip.match-c.active{background:var(--accent2);border-color:var(--accent2);}
+.dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:2px;}
+.d-open{background:var(--danger);}
+.d-partial{background:#c47a00;}
+.d-match{background:var(--accent2);}
+.d-ret{background:var(--ret);}
+.d-ant{background:var(--info);}
+.srch{width:175px;padding:4px 8px;border:1px solid var(--border2);border-radius:4px;font-size:12px;font-family:var(--font);}
+.exp{display:flex;gap:5px;margin-left:auto;}
+.bsm{padding:4px 9px;font-size:11px;border:1px solid var(--border2);border-radius:4px;background:var(--surface);cursor:pointer;color:var(--text2);font-family:var(--font);transition:background .1s;white-space:nowrap;}
+.bsm:hover{background:var(--surface2);}
+.bsm.pr{background:var(--accent);color:white;border-color:var(--accent);}
+.bsm.pr:hover{background:#0f3d27;}
+
+/* CONTENT */
+.ca{flex:1;overflow-y:auto;padding:1rem 1.4rem;}
+.tw{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+thead th{background:var(--surface2);padding:7px 9px;text-align:left;font-size:10px;font-weight:normal;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;}
+thead th:hover{background:var(--accent-bg);}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s;}
+tbody tr:hover{background:var(--surface2);}
+tbody tr.r-open{background:#fff8f5;}
+tbody tr.r-open:hover{background:#ffeedc;}
+tbody tr.r-open td:first-child{border-left:3px solid #d85a30;}
+tbody tr.r-match td:first-child{border-left:3px solid var(--accent2);}
+tbody tr.r-ret td:first-child{border-left:3px solid var(--ret);}
+tbody tr.r-ant td:first-child{border-left:3px solid var(--info);}
+td{padding:6px 9px;vertical-align:middle;}
+td.mo{font-family:var(--mono);font-size:11px;}
+td.rt{text-align:right;}
+td.deb{color:#1a5c3a;}
+td.cred{color:#8a1a1a;}
+.hcell{max-width:210px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;}
+.rcell{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;}
+
+/* STATUS BADGES */
+.sb{display:inline-block;padding:2px 6px;border-radius:3px;font-size:10px;letter-spacing:.03em;font-family:var(--mono);white-space:nowrap;}
+.sb-open{background:var(--danger-bg);color:var(--danger);}
+.sb-closed{background:var(--accent-bg);color:var(--accent);}
+.sb-partial{background:var(--warn-bg);color:var(--warn);}
+.sb-match{background:#e8f5ee;color:#1a5c3a;}
+.sb-ret{background:var(--ret-bg);color:var(--ret);}
+.sb-ant{background:var(--info-bg);color:var(--info);}
+.sb-na{background:var(--border);color:var(--text3);}
+
+/* SUMMARY */
+.sgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:11px;margin-bottom:1.4rem;}
+.scard{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:.9rem;}
+.scard h3{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);margin-bottom:7px;}
+.scard .v{font-size:18px;font-family:var(--mono);margin-bottom:3px;}
+.scard .v.danger{color:var(--danger);}
+.scard .v.success{color:var(--accent);}
+.scard .v.warn{color:var(--warn);}
+.scard .v.ret{color:var(--ret);}
+.scard .sv{font-size:11px;color:var(--text3);}
+
+/* RET SECTION */
+.ret-box{background:var(--ret-bg);border:1px solid #c9a8e8;border-radius:6px;padding:.9rem;margin-bottom:1.4rem;}
+.ret-box h2{font-size:11px;color:var(--ret);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.7rem;}
+
+/* EMPTY/LOADING */
+.empty{text-align:center;padding:4rem 2rem;color:var(--text3);}
+.empty .big{font-size:3rem;margin-bottom:1rem;display:block;}
+.empty h2{font-size:16px;font-weight:normal;color:var(--text2);margin-bottom:.5rem;}
+.loading{text-align:center;padding:3rem;color:var(--text2);}
+.pbar{width:100%;height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin:12px 0;}
+.pfill{height:100%;background:var(--accent2);border-radius:2px;transition:width .3s;}
+.tag{display:inline-block;padding:1px 5px;border-radius:3px;font-size:10px;font-family:var(--mono);background:var(--info-bg);color:var(--info);margin-right:3px;}
+.tag.r{background:var(--accent-bg);color:var(--accent);}
+.tag.p{background:var(--danger-bg);color:var(--danger);}
+
+/* VALIDAÇÃO FINANCEIRO */
+.vf-upload-zone{border:1.5px dashed var(--border2);border-radius:6px;padding:1rem;text-align:center;cursor:pointer;background:var(--surface2);transition:border-color .2s,background .2s;margin-bottom:1rem;}
+.vf-upload-zone:hover,.vf-upload-zone.drag{border-color:var(--info);background:var(--info-bg);}
+.vf-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:1rem;}
+.vf-card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:.8rem;}
+.vf-card h3{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:5px;}
+.vf-card .v{font-size:17px;font-family:var(--mono);}
+.vf-card .sv{font-size:11px;color:var(--text3);}
+.r-concil td:first-child{border-left:3px solid var(--accent2);}
+.r-so-razao td:first-child{border-left:3px solid var(--warn);}
+.r-so-fin td:first-child{border-left:3px solid var(--info);}
+.r-diverg td:first-child{border-left:3px solid var(--danger);}
+.sb-concil{background:var(--accent-bg);color:var(--accent);}
+.sb-so-razao{background:var(--warn-bg);color:var(--warn);}
+.sb-so-fin{background:var(--info-bg);color:var(--info);}
+.sb-diverg{background:var(--danger-bg);color:var(--danger);}
+</style>
+</head>
+<body>
+<header>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <img src="data:image/gif;base64,R0lGODlhPAA8APcAAP//////zP//mf//Zv//M///AP/M///MzP/Mmf/MZv/MM//MAP+Z//+ZzP+Zmf+ZZv+ZM/+ZAP9m//9mzP9mmf9mZv9mM/9mAP8z//8zzP8zmf8zZv8zM/8zAP8A//8AzP8Amf8AZv8AM/8AAMz//8z/zMz/mcz/Zsz/M8z/AMzM/8zMzMzMmczMZszMM8zMAMyZ/8yZzMyZmcyZZsyZM8yZAMxm/8xmzMxmmcxmZsxmM8xmAMwz/8wzzMwzmcwzZswzM8wzAMwA/8wAzMwAmcwAZswAM8wAAJn//5n/zJn/mZn/Zpn/M5n/AJnM/5nMzJnMmZnMZpnMM5nMAJmZ/5mZzJmZmZmZZpmZM5mZAJlm/5lmzJlmmZlmZplmM5lmAJkz/5kzzJkzmZkzZpkzM5kzAJkA/5kAzJkAmZkAZpkAM5kAAGb//2b/zGb/mWb/Zmb/M2b/AGbM/2bMzGbMmWbMZmbMM2bMAGaZ/2aZzGaZmWaZZmaZM2aZAGZm/2ZmzGZmmWZmZmZmM2ZmAGYz/2YzzGYzmWYzZmYzM2YzAGYA/2YAzGYAmWYAZmYAM2YAADP//zP/zDP/mTP/ZjP/MzP/ADPM/zPMzDPMmTPMZjPMMzPMADOZ/zOZzDOZmTOZZjOZMzOZADNm/zNmzDNmmTNmZjNmMzNmADMz/zMzzDMzmTMzZjMzMzMzADMA/zMAzDMAmTMAZjMAMzMAAAD//wD/zAD/mQD/ZgD/MwD/AADM/wDMzADMmQDMZgDMMwDMAACZ/wCZzACZmQCZZgCZMwCZAABm/wBmzABmmQBmZgBmMwBmAAAz/wAzzAAzmQAzZgAzMwAzAAAA/wAAzAAAmQAAZgAAMwAAACyhovH4+eTy88jm5w19fw5+gCaLjS2hojSlpjuoqUWsrUGam1WztGO4uX3DxJHOz6TV1i2hoS6ioS+jo2+/v7jg4Nfu7vf7+/z+/v7//vb77+Dww6nPRrLVWsTegNXnnM7hcv399/7+/PTx0fr35vG1MfO7Pv///yH5BAEAAP8ALAAAAAA8ADwAAAj/AAEIHEiwoMGDCBMqXMiwocOHECNKnEixosWLGDNq3Mixo8ePIEOKHEmypMmTKFOmzOau3ZNz7lQOzMfv3r18BMVh2xmunUp98ubZo0fUHsF1O7GJ24ZS3r579YhKpUcwXNKlJvkJncq16lWmJOdFlVrPnll7Ub3uxDpyH1d69wgOVasUbMh497jakyeX6kCra+2CxDu13r6Cc/9+JZlXalzEfgUCVurOHbpz59DFBABPm2fPljGjawevYOjM7bQNbEyvHl+aOAEklpw0XDlySdeROwfgHbnfv8WB2/lNXDmw8M6RG86TnLlt+hrXmycQAYLYswFMTsod27pz8Jh3/+cuzic6pOPVzcnX2J4+APv8IRiYffv4neDQlbvfXRy6yeGwUw5g6ETXGl8AINDPfALVR9457ZgjHjbh6LTTOuy00w476OF3VTvZZKPNeT7lRR18/ixIX2TafVjaO+d0iM03iwGQjTn8hWMXPO5kow8+9bzHTwL9qNggi5OxZSNu9ympjYXdfQNOOSAOFB11+ShYJIOyIVmjQOzwpyQA+yVFI3friHNONgLFNmQCcB4m0D1GKRYYQWE2KVie3v0m407kqCZRkjuWOd6YTGKTH4zkhNNhOuW8M+iX20DZn13bTAaOTwK5cw6U67jzzmeksimQiHSxpY2hM4qnKqvYmNmzmUDtoAfOiOPkqqsn6Axkjjh0gWNOO+gkupOASQlLrLHYlAOOf+54dg5z4NzITTfYZvvEQOWUQxd/2ATK7H3luGOhbeR0aM475mTr7rYCCTrQhPeRI6p949mbDbjiqFaOu9n2ipCi5JRjqVKy2jjZmVcl/I5+E4LDDlhPuOtNOejIa9Bo0W5DLGqzZgNgZiAXpM02l6Fm6pLeiPPENpJiJPJVs050ssYyEyqTQjPfuTNCPdf1M9Ad6jj0Qdn8Zg4626x89NNQRy311FRXbfXVWGet9dZcExQQADs=" alt="BPS4" style="height:36px;width:auto;display:block;">
+    <div style="width:1px;height:28px;background:rgba(255,255,255,0.25);"></div>
+    <h1>Conciliação Contábil</h1>
+  </div>
+  <span class="ver">Razão Analítico — MKB e Domínio · v3.0</span>
+</header>
+
+<div class="sys-sel-bar">
+  <label>Sistema contábil:</label>
+  <button class="sys-btn active" id="btn-mkb"     onclick="setSystem('mkb')">Protheus (TOTVS)</button>
+  <button class="sys-btn"        id="btn-dominio"  onclick="setSystem('dominio')">Domínio (Thomson Reuters)</button>
+  <span class="sys-badge" id="sys-badge">Protheus ativo</span>
+  <span id="sys-hint" style="margin-left:auto;font-size:10px;color:rgba(255,255,255,.4);">Mude o sistema antes de carregar o arquivo</span>
+</div>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="ss">
+      <div class="slbl">Arquivo do Razão</div>
+      <div class="upload-zone" id="uz" onclick="document.getElementById('fi').click()">
+        <span class="icon">📁</span>
+        <p id="uz-prompt"><strong>Clique para carregar</strong><br>ou arraste o .xlsx aqui</p>
+      </div>
+      <input type="file" id="fi" accept=".xlsx,.xls">
+      <div id="finfo" style="margin-top:7px;font-size:11px;color:var(--text3);"></div>
+    </div>
+
+    <div class="ss" id="fpanel" style="display:none">
+      <div class="slbl">Filtros Adicionais</div>
+      <div class="fg"><label>Tipo de conta</label>
+        <select id="f-tipo">
+          <option value="">Todas</option>
+          <option value="1.1.1">Caixa/Bancos (1.1.1)</option>
+          <option value="1.1.2">Aplicações (1.1.2)</option>
+          <option value="1.1.3">A Receber (1.1.3)</option>
+          <option value="1.1.4">Outros Ativos (1.1.4)</option>
+          <option value="1.2.1">Ativo NCirc. (1.2.1)</option>
+          <option value="2.1.2">Fornecedores (2.1.2)</option>
+          <option value="2.1.3">Obrig. Trab. (2.1.3)</option>
+          <option value="2.1.4">Obrig. Trib. (2.1.4)</option>
+          <option value="2.1.5">Outras c/ Pagar (2.1.5)</option>
+          <option value="2.2.1">Passivo LP (2.2.1)</option>
+        </select>
+      </div>
+      <div class="fg"><label>Conta específica</label><select id="f-conta"><option value="">Todas</option></select></div>
+      <div class="fg"><label>Filial</label><select id="f-filial"><option value="">Todas</option></select></div>
+      <div class="fg"><label>Período — início</label><input type="date" id="f-ini"></div>
+      <div class="fg"><label>Período — fim</label><input type="date" id="f-fim"></div>
+      <button class="btn" onclick="tfAplicar()">Aplicar filtros</button>
+      <button class="btn btn-o" onclick="tfLimpar()">Limpar</button>
+    </div>
+
+    <div class="ss" id="lpanel" style="display:none">
+      <div class="slbl">Legenda</div>
+      <div style="font-size:11px;line-height:2.1">
+        <div><span class="dot d-open"></span> Em aberto</div>
+        <div><span class="dot d-partial"></span> Parcialmente comp.</div>
+        <div><span class="dot d-match"></span> Match NF = Recebimento</div>
+        <div><span class="dot d-ret"></span> Retenção de imposto</div>
+        <div><span class="dot d-ant"></span> Comp. saldo anterior</div>
+      </div>
+    </div>
+
+    <div class="acc-list" id="acclist"></div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div id="est" class="empty">
+      <span class="big">📊</span>
+      <h2>Nenhum arquivo carregado</h2>
+      <p>Carregue o razão analítico (.xlsx) para iniciar.</p>
+    </div>
+    <div id="lst" class="loading" style="display:none">
+      <p>Processando razão contábil...</p>
+      <div class="pbar" style="max-width:300px;margin:12px auto;"><div class="pfill" id="pfill" style="width:0%"></div></div>
+      <p id="lmsg" style="font-size:11px;color:var(--text3);margin-top:6px;"></p>
+    </div>
+
+    <div id="app" style="display:none;flex-direction:column;height:100%;">
+
+      <!-- BARRA FILTROS -->
+      <div class="tfbar">
+        <div class="tfg">
+          <label>Tipo de Conta</label>
+          <select class="tf-tipo" id="tf-tipo" onchange="syncConta()">
+            <option value="">Todos os tipos</option>
+            <option value="1.1.1">Caixa e Bancos (1.1.1)</option>
+            <option value="1.1.2">Aplicações Financeiras (1.1.2)</option>
+            <option value="1.1.3">A Receber (1.1.3)</option>
+            <option value="1.1.4">Outros Ativos Circ. (1.1.4)</option>
+            <option value="1.2.1">Ativo Não Circulante (1.2.1)</option>
+            <option value="2.1.2">Fornecedores (2.1.2)</option>
+            <option value="2.1.3">Obrig. Trabalhistas (2.1.3)</option>
+            <option value="2.1.4">Obrig. Tributárias (2.1.4)</option>
+            <option value="2.1.5">Outras c/ Pagar (2.1.5)</option>
+            <option value="2.2.1">Passivo Longo Prazo (2.2.1)</option>
+            <option value="2.2.4">Outros Passivos (2.2.4)</option>
+          </select>
+        </div>
+        <div class="tfg">
+          <label>Conta Contábil</label>
+          <select class="tf-conta" id="tf-conta"><option value="">Todas as contas</option></select>
+        </div>
+        <div class="tfg">
+          <label>Filial</label>
+          <select class="tf-filial" id="tf-filial"><option value="">Todas</option></select>
+        </div>
+        <div class="tfg"><label>Período — de</label><input type="date" class="tf-date" id="tf-ini"></div>
+        <span class="tf-sep">→</span>
+        <div class="tfg"><label>Período — até</label><input type="date" class="tf-date" id="tf-fim"></div>
+        <div class="tf-btns">
+          <button class="tfbtn clear" onclick="tfLimpar()">Limpar</button>
+          <button class="tfbtn apply" onclick="tfAplicar()">Filtrar</button>
+        </div>
+      </div>
+
+      <!-- TAGS ATIVOS -->
+      <div class="tags-row hidden" id="tagsrow"></div>
+
+      <!-- SALDO ABERTURA -->
+      <div class="saldo-bar" id="saldo-bar">
+        <label id="saldo-nat-label">Saldo de Abertura (31/12/2025):</label>
+        <div id="saldo-conta-lbl" style="font-size:11px;color:var(--warn);font-family:var(--mono);background:#fff8e0;border:1px solid #e8d88a;border-radius:4px;padding:2px 8px;white-space:nowrap;">
+          Selecione uma conta contábil
+        </div>
+        <input type="number" id="saldo-in" step="0.01" placeholder="Ex: 886015.17" disabled style="opacity:.5">
+        <button class="sbtn" id="saldo-btn" onclick="aplicarSaldo()" disabled style="opacity:.5">Aplicar</button>
+        <div style="width:1px;height:24px;background:var(--border2);margin:0 4px;"></div>
+        <button class="sbtn" id="comp-btn" onclick="document.getElementById('comp-fi').click()" disabled style="opacity:.5;background:#6b3fa0;">📎 Composição</button>
+        <input type="file" id="comp-fi" accept=".xlsx,.xls,.csv" style="display:none" onchange="loadComposicao(this)">
+        <div id="comp-lbl" style="font-size:11px;color:var(--ret);display:none;"></div>
+        <button class="sbtn" id="comp-clear-btn" onclick="clearComposicao()" style="display:none;background:#999;font-size:10px;padding:0 8px;">✕ Composição</button>
+        <div id="saldo-bdg" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+        <span id="saldo-hint" class="saldo-hint">ℹ️ Selecione uma conta contábil no filtro acima para habilitar este campo</span>
+      </div>
+
+      <!-- TABS -->
+      <div class="ptabs">
+        <button class="ptab active" onclick="showP('resumo')">Resumo</button>
+        <button class="ptab" onclick="showP('concil')">Conciliação</button>
+        <button class="ptab" onclick="showP('abertos')">Em Aberto</button>
+        <button class="ptab" onclick="showP('ret')">Retenções</button>
+        <button class="ptab" onclick="showP('razao')">Razão Completo</button>
+        <button class="ptab" onclick="showP('contas')">Por Conta</button>
+        <button class="ptab" style="background:var(--accent);color:white;border-radius:4px 4px 0 0;font-weight:bold;" onclick="showP('resultado')">★ Resultado Final</button>
+        <button class="ptab" style="background:#8a1a1a;color:white;border-radius:4px 4px 0 0;font-weight:bold;" onclick="showP('diverg')">⚠ Divergências</button>
+        <button class="ptab" style="background:var(--info);color:white;border-radius:4px 4px 0 0;font-weight:bold;" onclick="showP('validfin')">🔗 Validação Financeiro</button>
+      </div>
+
+      <!-- METRICS -->
+      <div class="metrics">
+        <div class="metric"><span class="mlbl">Lançamentos</span><span class="mval" id="m-tot">—</span></div>
+        <div class="metric"><span class="mlbl">Match NF</span><span class="mval success" id="m-match">—</span></div>
+        <div class="metric"><span class="mlbl">Em Aberto</span><span class="mval danger" id="m-open">—</span></div>
+        <div class="metric"><span class="mlbl">Valor em Aberto</span><span class="mval warn" id="m-oval">—</span></div>
+        <div class="metric"><span class="mlbl">Retenções</span><span class="mval ret" id="m-ret">—</span></div>
+        <div class="metric"><span class="mlbl">Valor Retido</span><span class="mval ret" id="m-rval">—</span></div>
+      </div>
+
+      <!-- CHIPS + BUSCA -->
+      <div class="frow">
+        <span class="chip active" id="chip-all" onclick="setSF('all')">Todos</span>
+        <span class="chip" id="chip-open" onclick="setSF('open')"><span class="dot d-open"></span> Em aberto</span>
+        <span class="chip" id="chip-partial" onclick="setSF('partial')"><span class="dot d-partial"></span> Parciais</span>
+        <span class="chip match-c" id="chip-match" onclick="setSF('match')"><span class="dot d-match"></span> Match</span>
+        <span class="chip ret-c" id="chip-ret" onclick="setSF('ret')"><span class="dot d-ret"></span> Retenção</span>
+        <span class="chip" id="chip-anterior" onclick="setSF('anterior')"><span class="dot d-ant"></span> Saldo ant.</span>
+        <input class="srch" type="text" id="srch" placeholder="Buscar NF, cliente, conta..." oninput="doSearch()">
+        <div class="exp">
+          <button class="bsm" onclick="expCSV()">CSV</button>
+          <button class="bsm pr" onclick="expXLSX()">Excel</button>
+        </div>
+      </div>
+
+      <!-- PANELS -->
+      <div class="ca" id="panel-resumo">
+        <div class="sgrid" id="sgrid"></div>
+        <div id="stbl"></div>
+      </div>
+
+      <div class="ca" id="panel-concil" style="display:none">
+        <div class="tw"><table>
+          <thead><tr>
+            <th onclick="sc('c','data')">Data</th>
+            <th>NF / Doc</th><th>Razão Social</th><th>Conta</th>
+            <th>Histórico</th>
+            <th onclick="sc('c','debito')">Débito (NF)</th>
+            <th onclick="sc('c','credito')">Crédito (Rec.)</th>
+            <th>Saldo</th><th>Status</th><th>Observação</th><th></th>
+          </tr></thead>
+          <tbody id="tb-concil"></tbody>
+        </table></div>
+      </div>
+
+      <div class="ca" id="panel-abertos" style="display:none">
+        <div class="tw"><table>
+          <thead><tr>
+            <th onclick="sc('a','data')">Data</th>
+            <th>NF / Doc</th><th>Razão Social</th><th>Conta</th>
+            <th>Histórico</th>
+            <th onclick="sc('a','debito')">Débito</th>
+            <th onclick="sc('a','credito')">Crédito</th>
+            <th>Saldo Aberto</th><th>Status</th>
+          </tr></thead>
+          <tbody id="tb-abertos"></tbody>
+        </table></div>
+      </div>
+
+      <div class="ca" id="panel-ret" style="display:none">
+        <div class="ret-box">
+          <h2>⚠ Diferença entre NF e recebimento — possível imposto retido pelo cliente</h2>
+          <div class="tw"><table>
+            <thead><tr>
+              <th>Data NF</th><th>Data Rec.</th><th>Nº NF</th><th>Razão Social</th>
+              <th>Conta</th><th>Vl. NF (Déb.)</th><th>Vl. Recebido (Créd.)</th>
+              <th>Vl. Retido</th><th>% Retenção</th>
+            </tr></thead>
+            <tbody id="tb-ret"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <div class="ca" id="panel-razao" style="display:none">
+        <div class="tw"><table>
+          <thead><tr>
+            <th onclick="sc('r','data')">Data</th><th>Lote/Doc</th>
+            <th>Nº NF</th><th>Razão Social</th><th>Conta</th>
+            <th>Histórico</th><th>Filial</th>
+            <th onclick="sc('r','debito')">Débito</th>
+            <th onclick="sc('r','credito')">Crédito</th>
+            <th>Saldo</th><th>Status</th>
+          </tr></thead>
+          <tbody id="tb-razao"></tbody>
+        </table></div>
+      </div>
+
+      <div class="ca" id="panel-contas" style="display:none">
+        <table>
+          <thead><tr>
+            <th>Código</th><th>Descrição</th><th>Tipo</th>
+            <th>Lanç.</th><th>Total Déb.</th><th>Total Créd.</th>
+            <th>Saldo Líq.</th><th>Em Aberto</th><th>Vl. Aberto</th>
+            <th>Retenções</th><th>Vl. Retido</th><th>Status</th>
+          </tr></thead>
+          <tbody id="tb-contas"></tbody>
+        </table>
+      </div>
+
+      <!-- RESULTADO FINAL -->
+      <div class="ca" id="panel-resultado" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px;">
+          <div>
+            <div style="font-size:13px;font-weight:bold;color:var(--accent)">Resultado Final da Conciliação</div>
+            <div style="font-size:11px;color:var(--text3)">Itens em aberto consolidados por NF e Razão Social, com saldo acumulado</div>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button class="bsm" onclick="expResultCSV()">CSV</button>
+            <button class="bsm pr" onclick="expResultXLSX()">Excel</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:1rem;flex-wrap:wrap;" id="res-metrics"></div>
+        <div class="tw">
+          <table id="tbl-resultado">
+            <thead><tr>
+              <th onclick="scRes('data')">Data</th>
+              <th>Nº NF</th>
+              <th>Razão Social</th>
+              <th>Conta</th>
+              <th onclick="scRes('debito')">Valor NF (Déb.)</th>
+              <th onclick="scRes('credito')">Valor Rec. (Créd.)</th>
+              <th onclick="scRes('saldo')">Saldo em Aberto</th>
+              <th>Status</th>
+              <th>Observação</th>
+            </tr></thead>
+            <tbody id="tb-resultado"></tbody>
+          </table>
+        </div>
+      </div>
+
+
+      <!-- DIVERGÊNCIAS -->
+      <div class="ca" id="panel-diverg" style="display:none">
+        <div style="background:var(--danger-bg);border:1px solid #e8a8a8;border-radius:6px;padding:.9rem;margin-bottom:1rem;">
+          <div style="font-size:13px;font-weight:bold;color:var(--danger);margin-bottom:4px">⚠ Lançamentos sem contrapartida identificada</div>
+          <div style="font-size:11px;color:var(--text2)">Créditos com recebimento mas sem NF de débito no período — provavelmente referentes ao saldo anterior não carregado na composição. Débitos sem recebimento correspondente aparecem na aba Em Aberto.</div>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:1rem;flex-wrap:wrap;" id="diverg-metrics"></div>
+        <div class="tw">
+          <table>
+            <thead><tr>
+              <th>Data</th><th>Nº NF</th><th>Razão Social</th><th>Conta</th>
+              <th>Histórico</th><th>Débito</th><th>Crédito</th><th>Tipo</th><th>Situação</th>
+            </tr></thead>
+            <tbody id="tb-diverg"></tbody>
+          </table>
+        </div>
+      </div>
+
+
+      <!-- VALIDAÇÃO FINANCEIRO -->
+      <div class="ca" id="panel-validfin" style="display:none">
+
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:1rem;align-items:flex-start;">
+          <!-- Upload Contas a Receber -->
+          <div style="flex:1;min-width:220px;">
+            <div style="font-size:11px;font-weight:bold;color:var(--info);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">📥 Contas a Receber (Financeiro)</div>
+            <div class="vf-upload-zone" id="vf-rec-zone" onclick="document.getElementById('vf-rec-fi').click()">
+              <div style="font-size:18px;margin-bottom:4px">📄</div>
+              <div style="font-size:12px;color:var(--text2)"><strong>Carregar arquivo</strong><br>.xlsx ou .csv</div>
+            </div>
+            <input type="file" id="vf-rec-fi" accept=".xlsx,.xls,.csv" style="display:none" onchange="loadFinanceiro(this,'rec')">
+            <div id="vf-rec-lbl" style="font-size:11px;color:var(--accent);margin-top:4px;"></div>
+          </div>
+          <!-- Upload Contas a Pagar -->
+          <div style="flex:1;min-width:220px;">
+            <div style="font-size:11px;font-weight:bold;color:var(--danger);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">📥 Contas a Pagar (Financeiro)</div>
+            <div class="vf-upload-zone" id="vf-pag-zone" onclick="document.getElementById('vf-pag-fi').click()">
+              <div style="font-size:18px;margin-bottom:4px">📄</div>
+              <div style="font-size:12px;color:var(--text2)"><strong>Carregar arquivo</strong><br>.xlsx ou .csv</div>
+            </div>
+            <input type="file" id="vf-pag-fi" accept=".xlsx,.xls,.csv" style="display:none" onchange="loadFinanceiro(this,'pag')">
+            <div id="vf-pag-lbl" style="font-size:11px;color:var(--accent);margin-top:4px;"></div>
+          </div>
+          <!-- Filtros de validação -->
+          <div style="flex:1;min-width:180px;">
+            <div style="font-size:11px;font-weight:bold;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Filtros</div>
+            <div style="margin-bottom:8px;">
+              <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px;">Tipo</label>
+              <select id="vf-tipo" style="width:100%;font-size:12px;padding:5px 7px;border:1px solid var(--border2);border-radius:4px;">
+                <option value="all">Todos</option>
+                <option value="concil">✓ Conciliado</option>
+                <option value="so_razao">⚠ Só no Razão</option>
+                <option value="so_fin">⚠ Só no Financeiro</option>
+                <option value="diverg">✗ Valor Divergente</option>
+              </select>
+            </div>
+            <div style="margin-bottom:8px;">
+              <label style="font-size:11px;color:var(--text3);display:flex;justify-content:space-between;margin-bottom:3px;">
+                <span>Cliente / Fornecedor</span>
+                <span>
+                  <span style="cursor:pointer;color:var(--accent);font-size:10px;" onclick="vfSelecionarTodos(true)">Todos</span>
+                  &nbsp;
+                  <span style="cursor:pointer;color:var(--danger);font-size:10px;" onclick="vfSelecionarTodos(false)">Nenhum</span>
+                </span>
+              </label>
+              <input type="text" id="vf-cliente-busca" placeholder="Buscar cliente..." oninput="vfFiltrarCheckboxes()"
+                style="width:100%;font-size:11px;padding:4px 7px;border:1px solid var(--border2);border-radius:4px 4px 0 0;font-family:var(--font);box-sizing:border-box;">
+              <div id="vf-cliente-list"
+                style="max-height:150px;overflow-y:auto;border:1px solid var(--border2);border-top:none;border-radius:0 0 4px 4px;background:var(--surface);padding:2px 0;">
+                <div style="padding:8px;font-size:11px;color:var(--text3);">Carregue um arquivo financeiro</div>
+              </div>
+            </div>
+            <div style="margin-bottom:8px;">
+              <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px;">NF</label>
+              <input type="text" id="vf-nf" placeholder="Filtrar por NF..." oninput="renderValidFin()"
+                style="width:100%;font-size:12px;padding:5px 7px;border:1px solid var(--border2);border-radius:4px;font-family:var(--font);">
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px;">Módulo</label>
+              <select id="vf-modulo" style="width:100%;font-size:12px;padding:5px 7px;border:1px solid var(--border2);border-radius:4px;" onchange="renderValidFin();popularSelectClientes()">
+                <option value="rec">Contas a Receber (1.1.x)</option>
+                <option value="pag">Contas a Pagar (2.1.x)</option>
+              </select>
+            </div>
+
+            <button onclick="renderValidFin()" style="margin-top:8px;width:100%;padding:6px;background:var(--info);color:white;border:none;border-radius:4px;font-size:12px;cursor:pointer;font-family:var(--font);">Validar</button>
+          </div>
+          <div style="flex:1;min-width:180px;">
+            <div style="font-size:11px;font-weight:bold;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Exportar</div>
+            <button onclick="expValidFin()" style="width:100%;padding:6px;background:var(--accent);color:white;border:none;border-radius:4px;font-size:12px;cursor:pointer;font-family:var(--font);">Excel Completo</button>
+          </div>
+        </div>
+
+        <div class="vf-cards" id="vf-metrics"></div>
+
+        <div style="font-size:11px;color:var(--text3);margin-bottom:8px;">
+          <span style="margin-right:12px"><span class="sb sb-concil">✓ Conciliado</span> NF casou razão = financeiro</span>
+          <span style="margin-right:12px"><span class="sb sb-so-razao">⚠ Só Razão</span> contabilizado mas não no financeiro</span>
+          <span style="margin-right:12px"><span class="sb sb-so-fin">⚠ Só Financeiro</span> no financeiro mas não contabilizado</span>
+          <span><span class="sb sb-diverg">✗ Divergente</span> NF existe nos dois mas valores diferem</span>
+        </div>
+
+        <div class="tw">
+          <table>
+            <thead><tr>
+              <th>NF</th><th>Cliente / Fornecedor</th><th>Contas Contábeis</th>
+              <th>Emissão</th><th>Vencimento</th>
+              <th>Vl. Razão</th><th>Vl. Financeiro</th><th>Diferença</th>
+              <th>Dias Atraso</th><th>Status Fin.</th><th>Situação</th><th>Observação</th>
+            </tr></thead>
+            <tbody id="tb-validfin"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /app -->
+  </main>
+</div>
+
+<script>
+
+// ── SISTEMA CONTÁBIL ──────────────────────────────────────────────────────
+let _sistema = 'mkb'; // 'mkb' | 'dominio'
+function setSystem(s){
+  _sistema = s;
+  ['mkb','dominio'].forEach(x=>document.getElementById('btn-'+x).classList.toggle('active',x===s));
+  document.getElementById('sys-badge').textContent = s==='mkb'?'Protheus ativo':'Domínio ativo';
+  // Atualizar hint e zona de upload
+  var hint = document.getElementById('sys-hint');
+  var uzp  = document.getElementById('uz-prompt');
+  if(s==='dominio'){
+    if(hint) hint.innerHTML = '⚠️ Domínio: exporte o razão como <strong>.xlsx</strong> no próprio sistema antes de carregar';
+    if(hint) hint.style.color='#ffcc44';
+    if(uzp)  uzp.innerHTML = '<strong>Clique para carregar</strong><br>Domínio: use <b>.xlsx</b> (Arquivo → Exportar → Excel)';
+  } else {
+    if(hint) hint.innerHTML = 'Mude o sistema antes de carregar o arquivo';
+    if(hint) hint.style.color='rgba(255,255,255,.4)';
+    if(uzp)  uzp.innerHTML = '<strong>Clique para carregar</strong><br>ou arraste o .xlsx aqui';
+  }
+  // Resetar dados se já havia arquivo carregado
+  if(allData.length){
+    if(!confirm('Trocar o sistema irá limpar os dados atuais. Continuar?')){
+      setSystem(_sistema==='mkb'?'dominio':'mkb'); return;
+    }
+    allData=[];filtData=[];pares=[];
+    document.getElementById('app').style.display='none';
+    document.getElementById('est').style.display='block';
+  }
+}
+
+// ── STATE ─────────────────────────────────────────────────────────────────
+let allData=[], filtData=[], pares=[], statusF='all', sortSt={}, saldosAbertura={}, composicaoItens={}, finData={rec:[], pag:[]}; // composicaoItens: {conta_cod: [{nf,razao,valor,data}]}
+
+// ── UTILS ─────────────────────────────────────────────────────────────────
+const fBRL=v=>(isNaN(v)||v===null)?'—':new Intl.NumberFormat('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(v);
+const fDate=d=>d instanceof Date?d.toLocaleDateString('pt-BR'):(d||'—');
+const setP=(p,m)=>{document.getElementById('pfill').style.width=p+'%';document.getElementById('lmsg').textContent=m||'';};
+
+// ── EXTRAÇÃO DE NF E RAZÃO SOCIAL ─────────────────────────────────────────
+function exNF(h){
+  if(!h) return '';
+  const s = String(h);
+  let m;
+  // 1. NF seguido de ponto e dígitos: NF.000249, VL.NF.000204
+  m = s.match(/NF\.0*(\d+)/i);
+  if(m) return String(parseInt(m[1],10));
+  // 2. NF nº 000xxx  ou  nf nº 000xxx  (com "nº" ou "no")
+  m = s.match(/NF\s+n[oº°]?\.?\s*0*(\d+)/i);
+  if(m) return String(parseInt(m[1],10));
+  // 3. NF - 000xxx  (CANC.PGTO.NF - 000000069)
+  m = s.match(/NF\s*-\s*0*(\d+)/i);
+  if(m) return String(parseInt(m[1],10));
+  // 4. DOC. 000xxx  (PGTO.CF.CHQ. DOC. 000000249)
+  m = s.match(/DOC\.\s*0*(\d+)/i);
+  if(m) return String(parseInt(m[1],10));
+  // 5. TITULO 000xxx  (COMP PA TITULO 000126996)
+  m = s.match(/TITULO\s+0*(\d+)/i);
+  if(m) return String(parseInt(m[1],10));
+  // 6. REE 000xxx  (VLR. REE 000000069)
+  m = s.match(/REE\s+0*(\d+)/i);
+  if(m) return String(parseInt(m[1],10));
+  // 7. Genérico: sequência longa de dígitos (>=4) precedida de espaço
+  m = s.match(/(?:^|\s)0*(\d{4,})/);
+  if(m) return String(parseInt(m[1],10));
+  return '';
+}
+function exRS(h){
+  if(!h) return '';
+  const s = String(h);
+  let m, name;
+
+  // Padrão 1: "... DE NOME ..." — usado em VLR.REF.A NF.xxx DE NOME e CANC.PGTO.NF - xxx DE NOME
+  m = s.match(/\bDE\s+([A-Z0-9][A-Z0-9\s\.&]+?)(?:\s+(?:REF|ADR|SERV|COMP|OC|CONF|\d{2}\/)|\s*$)/i);
+  if(m){
+    name = m[1].trim().replace(/\s+[A-Z]$/,'').trim();
+    // Ignorar se parece CNPJ puro (só dígitos e pontos)
+    if(!/^[\d\.\-\/]+$/.test(name) && name.length > 1) return name;
+  }
+
+  // Padrão 2: "FORNECEDOR NOME" — COMP PA TITULO xxx FORNECEDOR NOME
+  m = s.match(/FORNECEDOR\s+([A-Z0-9][A-Z0-9\s\.&]+?)(?:\s*$)/i);
+  if(m) return m[1].trim().replace(/\s+[A-Z]$/,'').trim();
+
+  // Padrão 3: "- NOME REF" ou "- NOME " — PGTO.CF.CHQ. DOC. xxx - NOME REF
+  // ou VLR. REE xxx - NOME
+  const parts = s.split(/\s+-\s+/);
+  if(parts.length >= 2){
+    name = parts[parts.length-1].trim();
+    // Remove sufixos comuns
+    name = name.replace(/\s+(REF|SERV|MAT|COMP|OC|CONF)\.?.*$/i,'').trim();
+    name = name.replace(/\s+[A-Z]$/,'').trim();
+    if(name && !/^[\d\.\-\/]+$/.test(name) && name.length > 1) return name;
+  }
+
+  // Padrão 4: texto após último espaço-hífen em históricos com "DO FORNECEDOR NOME"
+  m = s.match(/DO\s+FORNECEDOR\s+([A-Z0-9][A-Z0-9\s]+?)(?:\s*$)/i);
+  if(m) return m[1].trim();
+
+  return '';
+}
+const isNFl =h=>/VL\.NF\.|NF\.\d|VL\.NF\s|VLR\.REF\.A\s+NF\.|PGTO\.CF\.CHQ\.|VLR\.\s*REE\s|COMP\s+PA\s+TITULO|Pag\.\s*de\s+despesas|CANC\.PGTO/i.test(h||'');
+const isRecl=h=>/VL\.REC|RECEBIDO|RECEBIMENTO|BAIXA|LIQUIDACAO|COMP\s+PA/i.test(h||'');
+
+// ── UPLOAD ────────────────────────────────────────────────────────────────
+document.getElementById('fi').addEventListener('change',e=>{if(e.target.files[0])loadF(e.target.files[0]);});
+const uz=document.getElementById('uz');
+uz.addEventListener('dragover',e=>{e.preventDefault();uz.classList.add('drag');});
+uz.addEventListener('dragleave',()=>uz.classList.remove('drag'));
+uz.addEventListener('drop',e=>{e.preventDefault();uz.classList.remove('drag');if(e.dataTransfer.files[0])loadF(e.dataTransfer.files[0]);});
+
+function loadF(file){
+  document.getElementById('est').style.display='none';
+  document.getElementById('lst').style.display='block';
+  document.getElementById('app').style.display='none';
+  document.getElementById('finfo').textContent=file.name+' ('+(file.size/1024/1024).toFixed(1)+' MB)';
+  setP(5,'Lendo arquivo...');
+  const rd=new FileReader();
+  rd.onload=e=>{setP(20,'Parseando planilha...');setTimeout(()=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      if(_sistema==='dominio') processWS_dominio(ws);
+      else processWS(ws);
+    }
+    catch(err){alert('Erro: '+err.message);document.getElementById('lst').style.display='none';document.getElementById('est').style.display='block';}
+  },50);};
+  rd.readAsArrayBuffer(file);
+}
+
+
+// ── PARSER DOMÍNIO ────────────────────────────────────────────────────────
+function processWS_dominio(ws){
+  setP(40,'Mapeando contas \u2014 Dom\u00ednio...');
+
+  // Ler com cellDates:true para tentar obter Date objects
+  // Se o SheetJS entregar serial num\u00e9rico, o fallback trata
+  const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true, cellDates:true});
+  const tx = [];
+  let cc=null, cd='';
+
+  // Helper: normalizar qualquer valor de data que o SheetJS possa entregar:
+  // - Date object (cellDates:true funcionou)
+  // - N\u00famero serial Excel (raw:true sem convers\u00e3o)
+  // - String "1/1/2026", "2026-01-01", "01/01/2026"
+  function toDate(v){
+    if(!v && v!==0) return null;
+    if(v instanceof Date) return isNaN(v.getTime()) ? null : v;
+    if(typeof v === 'number'){
+      if(v > 40000 && v < 60000){
+        // Serial Excel: 1 = 01/01/1900, com corre\u00e7\u00e3o do bug do 1900
+        return new Date(Math.round((v - 25569) * 86400 * 1000));
+      }
+      return null;
+    }
+    if(typeof v === 'string'){
+      const s = v.trim();
+      // Formato "M/D/YYYY" ou "MM/DD/YYYY" (SheetJS XLS padr\u00e3o EUA)
+      let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if(m) return new Date(parseInt(m[3]), parseInt(m[1])-1, parseInt(m[2]));
+      // Formato "DD/MM/YYYY" (BR)
+      m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if(m){
+        const d = new Date(parseInt(m[3]), parseInt(m[2])-1, parseInt(m[1]));
+        if(!isNaN(d.getTime())) return d;
+      }
+      // Formato ISO "YYYY-MM-DD"
+      m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if(m) return new Date(parseInt(m[1]), parseInt(m[2])-1, parseInt(m[3]));
+    }
+    return null;
+  }
+
+  // Helper: extrair n\u00famero de qualquer valor
+  function toNum(v){
+    if(v===null || v===undefined) return 0;
+    if(typeof v === 'number') return v;
+    const n = parseFloat(String(v).replace(/\./g,'').replace(',','.'));
+    return isNaN(n) ? 0 : n;
+  }
+
+  for(let i=0;i<rows.length;i++){
+    const r = rows[i];
+    if(!r) continue;
+
+    // Encontrar col[0] n\u00e3o nulo
+    const c0 = r[0];
+    if(c0===null || c0===undefined) continue;
+    const c0str = String(c0).trim();
+
+    // === LINHA DE CONTA ===
+    // Padr\u00e3o: col[0]='Conta:', col[1]=n\u00famero interno, col[2]=c\u00f3digo (1.x.x...), col[5]=nome
+    if(c0str === 'Conta:'){
+      cc = r[2]!==null && r[2]!==undefined ? String(r[2]).trim() : null;
+      cd = r[5]!==null && r[5]!==undefined ? String(r[5]).trim() : '';
+      // Pr\u00f3xima linha = SALDO ANTERIOR (ignorar)
+      if(i+1 < rows.length){
+        const nx = rows[i+1];
+        if(nx && nx[2] && String(nx[2]).includes('SALDO ANTERIOR')) i++;
+      }
+      continue;
+    }
+
+    // === LINHA DE LAN\u00c7AMENTO ===
+    // col[0]=data, col[1]=n\u00famero doc (inteiro), col[2]=hist\u00f3rico
+    // col[7]=cta.partida, col[8]=d\u00e9bito, col[9]=cr\u00e9dito, col[10]=saldo corrido
+    if(!cc) continue; // ainda n\u00e3o encontrou nenhuma conta
+
+    // Testar se col[0] \u00e9 data v\u00e1lida
+    const dt = toDate(c0);
+    if(!dt) continue;
+
+    // col[1] deve ser n\u00famero inteiro do documento
+    const numDoc = r[1]!==null && r[1]!==undefined ? Number(r[1]) : 0;
+    if(!numDoc || numDoc <= 0) continue;
+    // N\u00fameros de documento do Dom\u00ednio s\u00e3o inteiros tipicamente entre 1 e 999999
+    if(!Number.isFinite(numDoc) || numDoc > 9999999) continue;
+
+    const hist  = r[2]!==null && r[2]!==undefined ? String(r[2]).trim() : '';
+    const deb   = toNum(r[8]);
+    const cred  = toNum(r[9]);
+    if(deb===0 && cred===0) continue;
+
+    // Saldo: col[10] num\u00e9rico, negativo = credor no Dom\u00ednio
+    const saldoNum = toNum(r[10]);
+    const saldoNat = saldoNum >= 0 ? 'D' : 'C';
+    const saldoStr = Math.abs(saldoNum).toFixed(2) + ' ' + saldoNat;
+
+    tx.push({
+      data:dt,
+      lote_doc:String(Math.round(numDoc)),
+      lote:String(Math.round(numDoc)).substring(0,5),
+      historico:hist,
+      contrapartida: r[7]!==null && r[7]!==undefined ? String(r[7]).trim() : '',
+      filial:'',
+      conta_cod:cc, conta_desc:cd,
+      debito:deb, credito:cred, saldo_str:saldoStr,
+      nf:exNF(hist), razao_social:exRS(hist),
+      is_nf:isNFl(hist), is_rec:isRecl(hist),
+      status:'open', match_status:'', saldo_aberto:0, ret_val:0
+    });
+  }
+
+  if(tx.length === 0){
+    document.getElementById('lst').style.display='none';
+    document.getElementById('est').innerHTML = '<div style="text-align:center;padding:4rem 2rem;color:var(--text3)">'
+      + '<span style="font-size:3rem;display:block;margin-bottom:1rem">⚠️</span>'
+      + '<h2 style="font-size:16px;font-weight:normal;color:var(--text2);margin-bottom:.5rem">Nenhum lançamento encontrado</h2>'
+      + '<p style="font-size:13px;max-width:420px;margin:0 auto;line-height:1.6">'
+      + '<strong>Domínio:</strong> o arquivo precisa estar no formato <strong>.xlsx</strong>.<br><br>'
+      + 'No Domínio, acesse <strong>Arquivo → Exportar → Planilha Excel (.xlsx)</strong> '
+      + 'ou abra o .xls no Excel/LibreOffice e salve como .xlsx antes de carregar.'
+      + '</p></div>';
+    document.getElementById('est').style.display='block';
+    return;
+  }
+
+  setP(65,'Conciliando...');
+  setTimeout(()=>classifyAll(tx),50);
+}
+
+
+function processWS(ws){
+  setP(40,'Mapeando contas...');
+  const range=XLSX.utils.decode_range(ws['!ref']);
+  let cc=null,cd=''; const tx=[];
+  for(let r=range.s.r;r<=range.e.r;r++){
+    const c0=ws[XLSX.utils.encode_cell({r,c:0})];if(!c0)continue;
+    const v0=c0.v,t0=c0.t;
+    if(t0==='s'&&typeof v0==='string'&&v0.startsWith('CONTA - ')){
+      const p=v0.replace('CONTA - ','').split(' - ');cc=p[0].trim();cd=p.slice(1).join(' - ').trim();continue;
+    }
+    if(t0==='d'||(t0==='n'&&v0>40000&&v0<60000)){
+      const lote=(ws[XLSX.utils.encode_cell({r,c:1})]||{}).v;
+      const hist=String((ws[XLSX.utils.encode_cell({r,c:2})]||{}).v||'').trim();
+      const contra=String((ws[XLSX.utils.encode_cell({r,c:3})]||{}).v||'').trim();
+      const filial=String((ws[XLSX.utils.encode_cell({r,c:4})]||{}).v||'').trim();
+      const deb=parseFloat((ws[XLSX.utils.encode_cell({r,c:8})]||{}).v)||0;
+      const cred=parseFloat((ws[XLSX.utils.encode_cell({r,c:9})]||{}).v)||0;
+      const saldo=String((ws[XLSX.utils.encode_cell({r,c:10})]||{}).v||'').trim();
+      if(!lote||(deb===0&&cred===0))continue;
+      const dt=t0==='d'?v0:new Date(Math.round((v0-25569)*86400*1000));
+      tx.push({data:dt,lote_doc:String(lote),lote:String(lote).substring(0,5),
+        historico:hist,contrapartida:contra,filial,conta_cod:cc,conta_desc:cd,
+        debito:deb,credito:cred,saldo_str:saldo,
+        nf:exNF(hist),razao_social:exRS(hist),
+        is_nf:isNFl(hist),is_rec:isRecl(hist),
+        status:'open',match_status:'',saldo_aberto:0,ret_val:0});
+    }
+  }
+  setP(65,'Conciliando...');
+  setTimeout(()=>classifyAll(tx),50);
+}
+
+// ── CONTAS DE CONTROLE ────────────────────────────────────────────────────
+const OPFX=['1.1.2','1.1.3','1.1.4','1.1.5','1.2.1','1.2.3','1.2.5','2.1.2','2.1.3','2.1.4','2.1.5','2.1.6','2.2.1','2.2.2','2.2.4','2.2.6'];
+const isOA=cod=>cod&&OPFX.some(p=>cod.startsWith(p));
+
+// ── CLASSIFICAÇÃO ─────────────────────────────────────────────────────────
+function classifyAll(tx){
+  tx.forEach(t=>{t.is_open_account=isOA(t.conta_cod);if(!t.is_open_account)t.status='na';});
+  const cmap={};
+  tx.filter(t=>t.is_open_account).forEach(t=>{if(!cmap[t.conta_cod])cmap[t.conta_cod]=[];cmap[t.conta_cod].push(t);});
+  pares=[];
+
+  Object.values(cmap).forEach(items=>{
+    // ── REGRA FUNDAMENTAL ──────────────────────────────────────────────────
+    // Lançamentos com NF extraída SÓ casam com outro lançamento da MESMA NF.
+    // NUNCA por valor coincidente — evita falsos positivos entre NFs distintas.
+    // Lançamentos sem NF podem casar por valor (compensação genérica).
+    // ───────────────────────────────────────────────────────────────────────
+
+    // 1. Match por NF exata: débito (VL.NF.) × crédito (VL.REC./VL.RECEBIDO)
+    // Apenas lançamentos ainda 'open' e com NF identificada
+    const nfIt = items.filter(t => t.is_nf  && t.debito>0  && t.nf && t.status==='open');
+    const rcIt = items.filter(t => t.is_rec  && t.credito>0 && t.nf && t.status==='open');
+    const usedR = new Set();
+
+    nfIt.forEach(nf => {
+      const rec = rcIt.find(r => !usedR.has(r) && r.nf===nf.nf && r.status==='open');
+      if (!rec) return;
+      usedR.add(rec);
+      const diff = Math.abs(nf.debito - rec.credito);
+      const pct  = nf.debito>0 ? (diff/nf.debito*100) : 0;
+
+      if (diff < 0.02) {
+        // Match exato
+        nf.status='match';  nf.match_status='Match NF/Rec';  nf.saldo_aberto=0;
+        rec.status='match'; rec.match_status='Match NF/Rec'; rec.saldo_aberto=0;
+        pares.push({tipo:'match',data_nf:nf.data,data_rec:rec.data,nf_num:nf.nf,
+          razao:nf.razao_social||rec.razao_social,conta:nf.conta_cod,
+          vl_nf:nf.debito,vl_rec:rec.credito,diferenca:0,pct:0});
+      } else if (pct>0.1 && pct<35) {
+        // Retenção de imposto
+        nf.status='ret';  nf.match_status='Retenção '+pct.toFixed(1)+'%'; nf.ret_val=diff; nf.saldo_aberto=diff;
+        rec.status='ret'; rec.match_status='Retenção '+pct.toFixed(1)+'%'; rec.ret_val=diff; rec.saldo_aberto=0;
+        pares.push({tipo:'ret',data_nf:nf.data,data_rec:rec.data,nf_num:nf.nf,
+          razao:nf.razao_social||rec.razao_social,conta:nf.conta_cod,
+          vl_nf:nf.debito,vl_rec:rec.credito,diferenca:diff,pct});
+      } else {
+        // Diferença grande — parcial
+        nf.status='partial'; nf.saldo_aberto=nf.debito-rec.credito;
+        rec.status='match';  rec.saldo_aberto=0;
+        pares.push({tipo:'partial',data_nf:nf.data,data_rec:rec.data,nf_num:nf.nf,
+          razao:nf.razao_social||rec.razao_social,conta:nf.conta_cod,
+          vl_nf:nf.debito,vl_rec:rec.credito,diferenca:diff,pct});
+      }
+    });
+
+    // 2. Lançamentos COM NF que não casaram no passo 1 → permanecem 'open'
+    // NÃO entram na compensação genérica por valor.
+    items.filter(t => t.nf && t.status==='open').forEach(t => {
+      t.saldo_aberto = t.debito || t.credito;
+      // status permanece 'open' — sem match de NF no período
+    });
+
+    // 3. Compensação genérica por valor — SOMENTE para lançamentos SEM NF identificada
+    // Esses são lançamentos cujo histórico não contém número de NF reconhecível.
+    const debs = items.filter(t => t.status==='open' && t.debito>0  && !t.nf).map(t=>({val:t.debito,  mtc:0,t}));
+    const crds = items.filter(t => t.status==='open' && t.credito>0 && !t.nf).map(t=>({val:t.credito, mtc:0,t}));
+
+    debs.forEach(d => {
+      // Exato primeiro
+      crds.forEach(c => { const a=Math.min(d.val-d.mtc,c.val-c.mtc); if(Math.abs((d.val-d.mtc)-(c.val-c.mtc))<0.02&&a>0){d.mtc+=a;c.mtc+=a;} });
+      // Proporcional
+      crds.forEach(c => { const a=Math.min(d.val-d.mtc,c.val-c.mtc); if(a>0.009){d.mtc+=a;c.mtc+=a;} });
+    });
+    debs.forEach(d => { const r=d.val-d.mtc; d.t.saldo_aberto=r; d.t.status=r<0.01?'closed':d.mtc>0?'partial':'open'; });
+    crds.forEach(c => { const r=c.val-c.mtc; c.t.saldo_aberto=r; c.t.status=r<0.01?'closed':c.mtc>0?'partial':'open'; });
+  });
+
+  setP(90,'Renderizando...');
+  setTimeout(()=>{
+    allData=tx;filtData=[...allData];
+    buildUI();setP(100,'');
+    document.getElementById('lst').style.display='none';
+    const ap=document.getElementById('app');ap.style.display='flex';
+    document.getElementById('fpanel').style.display='block';
+    document.getElementById('lpanel').style.display='block';
+  },50);
+}
+
+// ── SALDO ABERTURA POR CONTA ──────────────────────────────────────────────
+// Fonte única de verdade para a conta atualmente filtrada
+let _contaAtual = '';
+
+function getContaFiltrada(){
+  return _contaAtual;
+}
+
+function setContaAtual(cod){
+  _contaAtual = cod || '';
+  syncSaldoBar();
+}
+
+function syncSaldoBar(){
+  const conta = getContaFiltrada();
+  const lbl = document.getElementById('saldo-conta-lbl');
+  const inp = document.getElementById('saldo-in');
+  const btn = document.getElementById('saldo-btn');
+  if(!conta){
+    lbl.textContent='Nenhuma conta selecionada';
+    lbl.style.color='var(--text3)';
+    inp.disabled=true; inp.style.opacity='.4'; inp.value='';
+    btn.disabled=true; btn.style.opacity='.4';
+    const cb2=document.getElementById('comp-btn');
+    if(cb2){cb2.disabled=true;cb2.style.opacity='.4';}
+    const h=document.getElementById('saldo-hint');
+    if(h) h.textContent='ℹ️ Selecione uma conta contábil no filtro acima para habilitar este campo';
+  } else {
+    const t=allData.find(x=>x.conta_cod===conta);
+    lbl.textContent=(conta+(t?' — '+t.conta_desc:''));
+    lbl.style.color= getNatureza(conta)==='passivo' ? 'var(--info)' : 'var(--warn)';
+    const natLbl = document.getElementById('saldo-nat-label');
+    if(natLbl) natLbl.textContent = getNatureza(conta)==='passivo'
+      ? 'Saldo de Abertura — Passivo (31/12/2025):'
+      : 'Saldo de Abertura — Ativo (31/12/2025):';
+    inp.disabled=false; inp.style.opacity='1';
+    btn.disabled=false; btn.style.opacity='1';
+    const cb=document.getElementById('comp-btn');
+    if(cb){cb.disabled=false;cb.style.opacity='1';}
+    const nat = getNatureza(conta);
+    const natLabel = nat==='passivo'
+      ? '📘 Passivo — saldo credor (2.x): débitos reduzem o saldo'
+      : '📗 Ativo — saldo devedor (1.x): créditos reduzem o saldo';
+    const h2=document.getElementById('saldo-hint');
+    if(h2) h2.textContent='ℹ️ '+natLabel+' · Informe o saldo em 31/12/2025 e clique Aplicar';
+    // Pre-preencher se já existe saldo para essa conta
+    inp.value = saldosAbertura[conta] !== undefined ? saldosAbertura[conta] : '';
+  }
+  renderBadges();
+}
+
+// ── NATUREZA DA CONTA ────────────────────────────────────────────────────
+// Ativo (1.x.x): saldo devedor  → débito aumenta, crédito reduz
+// Passivo (2.x.x): saldo credor → crédito aumenta, débito reduz
+function getNatureza(conta){
+  if(!conta) return 'ativo';
+  return conta.startsWith('2') ? 'passivo' : 'ativo';
+}
+
+// Retorna o sinal do saldo: +1 para ativo (débito normal), -1 para passivo (crédito normal)
+// Na linha do razão: saldo = saldo_ant + debito*sinal - credito*sinal
+// Ativo:   saldo += debito - credito
+// Passivo: saldo += credito - debito  (crédito aumenta o passivo)
+function getSinalSaldo(conta){
+  return getNatureza(conta) === 'passivo' ? -1 : 1;
+}
+
+function aplicarSaldo(){
+  const conta = getContaFiltrada();
+  if(!conta){ alert('Selecione uma conta contábil antes de informar o saldo de abertura.'); return; }
+  const val=parseFloat(document.getElementById('saldo-in').value);
+  if(isNaN(val)||val<0){ alert('Informe um valor válido (pode ser 0,00).'); return; }
+
+  // Resetar lançamentos anteriores desta conta antes de recalcular
+  allData.forEach(t=>{if(t._was_ant&&t.conta_cod===conta){t.status=t._orig_st||'open';t._was_ant=false;t.match_status='';}});
+
+  saldosAbertura[conta]=val;
+
+  const comp = composicaoItens[conta];
+  const nat  = getNatureza(conta);
+  // Ativo: lançamentos que REDUZEM o saldo são CRÉDITOS → absorver créditos
+  // Passivo: lançamentos que REDUZEM o saldo são DÉBITOS → absorver débitos
+  const absorveLado = nat === 'passivo' ? 'debito' : 'credito';
+
+  if (comp && comp.length) {
+    // ── MODO COMPOSIÇÃO ──
+    const nfsComp = new Set(comp.map(it=>it.nf).filter(Boolean));
+    // NFs com lançamento do lado oposto no período (não absorver)
+    const nfsComContra = new Set(
+      allData.filter(t=>t.conta_cod===conta && t[absorveLado==='credito'?'debito':'credito']>0 && t.nf)
+             .map(t=>t.nf)
+    );
+    // Agrupar itens da composição por NF para tratar múltiplas parcelas
+    // Ex: NF 16447 com 3 linhas (R$2316,93 + R$2248,78 + R$2248,79) = R$6814,50
+    const compPorNF = {};
+    comp.forEach(it => {
+      const k = it.nf || ('_val_'+it.valor);
+      if (!compPorNF[k]) compPorNF[k] = {nf:it.nf, razao:it.razao, restante:0, itens:[]};
+      compPorNF[k].restante += it.valor;
+      compPorNF[k].itens.push(it);
+    });
+    const compRestante = Object.values(compPorNF);
+
+    allData.filter(t=>
+      t.is_open_account &&
+      t.conta_cod===conta &&
+      t[absorveLado]>0 &&
+      !(t.nf && nfsComContra.has(t.nf))
+    )
+    .sort((a,b)=>a.data-b.data)
+    .forEach(t=>{
+      const vlLado = t[absorveLado];
+      let matched = null;
+
+      // 1. Casar por NF exata (agrupa parcelas da mesma NF)
+      if (t.nf && nfsComp.has(t.nf))
+        matched = compRestante.find(g => g.nf===t.nf && g.restante>0);
+
+      // 2. Casar por valor aproximado (para itens sem NF)
+      if (!matched && !t.nf)
+        matched = compRestante.find(g => g.restante>0 && Math.abs(g.restante-vlLado)<0.02);
+
+      if (matched) {
+        // Absorver apenas o valor pendente do saldo anterior (não mais que isso)
+        const ab = Math.min(vlLado, matched.restante);
+        matched.restante -= ab;
+        t._orig_st=t.status; t.status='anterior'; t._was_ant=true;
+        t.match_status='Comp. NF ant. '+(matched.nf||'')+(matched.razao?' - '+matched.razao:'');
+        // Se o débito é maior que o absorvido, a diferença é do período corrente
+        t.saldo_aberto = vlLado - ab;
+        // Se sobrou saldo_aberto significa que parte do débito é NF do período
+        if (t.saldo_aberto > 0.01) {
+          t.match_status += ' (parcial — saldo ant: '+fBRL(ab)+')';
+        }
+      }
+    });
+
+  } else {
+    // ── MODO SALDO GLOBAL ──
+    let rest=val;
+    const nfsComContra = new Set(
+      allData.filter(t=>t.conta_cod===conta && t[absorveLado==='credito'?'debito':'credito']>0 && t.nf)
+             .map(t=>t.nf)
+    );
+    allData.filter(t=>
+      t.is_open_account &&
+      t.conta_cod===conta &&
+      t[absorveLado]>0 &&
+      !(t.nf && nfsComContra.has(t.nf)) &&
+      (t.status==='open'||t.status==='closed')
+    )
+    .sort((a,b)=>a.data-b.data)
+    .forEach(t=>{
+      if(rest<=0)return;
+      const vlLado = t[absorveLado];
+      // Absorver apenas o que ainda falta do saldo anterior
+      const ab=Math.min(vlLado,rest); rest-=ab;
+      t._orig_st=t.status; t.status='anterior'; t._was_ant=true;
+      t.match_status='Comp. saldo ant. '+fBRL(ab);
+      // Se vlLado > ab, a diferença é do período (não do saldo anterior)
+      t.saldo_aberto = vlLado - ab;
+      if (t.saldo_aberto > 0.01)
+        t.match_status += ' (parcial — período: '+fBRL(t.saldo_aberto)+')';
+    });
+  }
+
+  renderBadges();
+  renderAll();
+}
+
+function remSaldo(conta){
+  allData.forEach(t=>{if(t._was_ant&&t.conta_cod===conta){t.status=t._orig_st||'open';t._was_ant=false;t.match_status='';}});
+  delete saldosAbertura[conta];
+  const cur=getContaFiltrada();
+  if(cur===conta){ document.getElementById('saldo-in').value=''; }
+  renderBadges(); renderAll();
+}
+
+function renderBadges(){
+  const wrap=document.getElementById('saldo-bdg');
+  if(!Object.keys(saldosAbertura).length){ wrap.innerHTML=''; return; }
+  // Mostrar mesmo quando saldo é 0
+  wrap.innerHTML=Object.entries(saldosAbertura).map(([cod,val])=>{
+    const t=allData.find(x=>x.conta_cod===cod);
+    const nm=t?t.conta_desc:'';
+    // Calcular restante para esta conta
+    const absorvido=allData.filter(x=>x._was_ant&&x.conta_cod===cod).reduce((s,x)=>s+x.credito,0);
+    const rest=Math.max(0,val-absorvido);
+    return `<span class="saldo-badge" title="${cod} — ${nm}">
+      <span style="font-size:10px;opacity:.7">${cod}</span>
+      &nbsp;${fBRL(val)}
+      ${rest>0?`<span style="font-size:10px;color:#c47a00"> | restante: ${fBRL(rest)}</span>`:'<span style="font-size:10px;color:var(--accent)"> ✓ zerado</span>'}
+      <span class="rm" onclick="remSaldo('${cod}')" title="Remover">✕</span>
+    </span>`;
+  }).join('');
+}
+
+// ── BUILD UI ──────────────────────────────────────────────────────────────
+function buildUI(){popFilts();setContaAtual('');renderAll();renderAccList();renderTags();}
+function renderAll(){updMetrics();renderResumo();renderConcil();renderAbertos();renderRet();renderRazao();renderContas();renderResultado();renderDiverg();renderAccList();}
+
+function popFilts(){
+  const contas=[...new Set(allData.map(t=>t.conta_cod).filter(Boolean))].sort();
+  const filiais=[...new Set(allData.map(t=>t.filial).filter(Boolean))].sort();
+  const dates=allData.map(t=>t.data).filter(Boolean).sort((a,b)=>a-b);
+  const optC='<option value="">Todas as contas</option>'+contas.map(c=>{const t=allData.find(x=>x.conta_cod===c);return`<option value="${c}">${c} — ${t?t.conta_desc:''}</option>`;}).join('');
+  document.getElementById('tf-conta').innerHTML=optC;
+  document.getElementById('f-conta').innerHTML='<option value="">Todas</option>'+contas.map(c=>{const t=allData.find(x=>x.conta_cod===c);return`<option value="${c}">${c} — ${t?t.conta_desc:''}</option>`;}).join('');
+  const optF='<option value="">Todas</option>'+filiais.map(f=>`<option value="${f}">${f}</option>`).join('');
+  document.getElementById('tf-filial').innerHTML=document.getElementById('f-filial').innerHTML=optF;
+  if(dates.length){const ini=dates[0].toISOString().split('T')[0],fim=dates[dates.length-1].toISOString().split('T')[0];['tf-ini','f-ini'].forEach(id=>document.getElementById(id).value=ini);['tf-fim','f-fim'].forEach(id=>document.getElementById(id).value=fim);}
+}
+
+function syncConta(){
+  const tipo=document.getElementById('tf-tipo').value;
+  const c=[...new Set(allData.map(t=>t.conta_cod).filter(Boolean))].sort();
+  const fc=tipo?c.filter(x=>x.startsWith(tipo)):c;
+  document.getElementById('tf-conta').innerHTML='<option value="">Todas as contas</option>'+fc.map(c=>{const t=allData.find(x=>x.conta_cod===c);return`<option value="${c}">${c} — ${t?t.conta_desc:''}</option>`;}).join('');
+}
+
+function tfAplicar(){
+  const tipo=document.getElementById('tf-tipo').value,conta=document.getElementById('tf-conta').value;
+  const filial=document.getElementById('tf-filial').value;
+  const ini=document.getElementById('tf-ini').value,fim=document.getElementById('tf-fim').value;
+  const dI=ini?new Date(ini):null,dF=fim?new Date(fim):null;
+  filtData=allData.filter(t=>{
+    if(dI&&t.data<dI)return false;if(dF&&t.data>dF)return false;
+    if(tipo&&t.conta_cod&&!t.conta_cod.startsWith(tipo))return false;
+    if(conta&&t.conta_cod!==conta)return false;
+    if(filial&&t.filial!==filial)return false;
+    return true;
+  });
+  ['f-tipo','f-conta','f-filial','f-ini','f-fim'].forEach((id,i)=>{document.getElementById(id).value=[tipo,conta,filial,ini,fim][i];});
+  // Atualizar conta atual para o saldo de abertura
+  setContaAtual(conta);
+  renderAll();renderTags();
+}
+
+function tfLimpar(){
+  ['tf-tipo','tf-conta','tf-filial'].forEach(id=>document.getElementById(id).value='');
+  syncConta();filtData=[...allData];setContaAtual('');popFilts();renderAll();renderTags();
+}
+
+function renderTags(){
+  const tipo=document.getElementById('tf-tipo').value,conta=document.getElementById('tf-conta').value;
+  const filial=document.getElementById('tf-filial').value,ini=document.getElementById('tf-ini').value,fim=document.getElementById('tf-fim').value;
+  const tags=[];
+  if(tipo)tags.push({l:'Tipo: '+document.getElementById('tf-tipo').options[document.getElementById('tf-tipo').selectedIndex].text,c:()=>{document.getElementById('tf-tipo').value='';syncConta();tfAplicar();}});
+  if(conta)tags.push({l:'Conta: '+conta,c:()=>{document.getElementById('tf-conta').value='';tfAplicar();}});
+  if(filial)tags.push({l:'Filial: '+filial,c:()=>{document.getElementById('tf-filial').value='';tfAplicar();}});
+  if(ini||fim)tags.push({l:'Período: '+(ini||'…')+' → '+(fim||'…'),c:()=>{const d=allData.map(t=>t.data).filter(Boolean).sort((a,b)=>a-b);if(d.length){document.getElementById('tf-ini').value=d[0].toISOString().split('T')[0];document.getElementById('tf-fim').value=d[d.length-1].toISOString().split('T')[0];}tfAplicar();}});
+  const row=document.getElementById('tagsrow');
+  if(!tags.length){row.classList.add('hidden');return;}
+  row.classList.remove('hidden');
+  row.innerHTML='<span style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-right:4px">Filtros ativos:</span>'+tags.map((t,i)=>`<span class="atag">${t.l}<span class="rm" onclick="window._tc[${i}]()" title="Remover">✕</span></span>`).join('');
+  window._tc=tags.map(t=>t.c);
+}
+
+// ── CHIPS DE STATUS ───────────────────────────────────────────────────────
+function setSF(f){
+  statusF=f;
+  ['all','open','partial','match','ret','anterior'].forEach(x=>document.getElementById('chip-'+x).classList.toggle('active',x===f));
+  renderConcil();renderAbertos();renderRazao();updMetrics();
+}
+function doSearch(){renderConcil();renderAbertos();renderRazao();updMetrics();}
+
+function getVD(){
+  let d=[...filtData];
+  const q=(document.getElementById('srch').value||'').toLowerCase();
+  if(statusF==='open')d=d.filter(t=>t.is_open_account&&t.status==='open');
+  else if(statusF==='partial')d=d.filter(t=>t.is_open_account&&t.status==='partial');
+  else if(statusF==='match')d=d.filter(t=>t.status==='match');
+  else if(statusF==='ret')d=d.filter(t=>t.status==='ret');
+  else if(statusF==='anterior')d=d.filter(t=>t.status==='anterior');
+  if(q)d=d.filter(t=>(t.historico||'').toLowerCase().includes(q)||(t.conta_cod||'').toLowerCase().includes(q)||(t.nf||'').includes(q)||(t.razao_social||'').toLowerCase().includes(q));
+  return d;
+}
+
+// ── STATUS BADGE + ROW CLASS ───────────────────────────────────────────────
+function sBadge(t){
+  if(!t.is_open_account||t.status==='na')return'<span class="sb sb-na">N/A</span>';
+  if(t.status==='match')return'<span class="sb sb-match">Match ✓</span>';
+  if(t.status==='ret')return'<span class="sb sb-ret">Retenção</span>';
+  if(t.status==='anterior')return'<span class="sb sb-ant">Saldo ant.</span>';
+  if(t.status==='open')return'<span class="sb sb-open">Em aberto</span>';
+  if(t.status==='partial')return'<span class="sb sb-partial">Parcial</span>';
+  return'<span class="sb sb-closed">Compensado</span>';
+}
+function rClass(t){if(t.status==='open'||t.status==='partial')return'r-open';if(t.status==='match')return'r-match';if(t.status==='ret')return'r-ret';if(t.status==='anterior')return'r-ant';return'';}
+
+// ── METRICS ───────────────────────────────────────────────────────────────
+function updMetrics(){
+  const d=getVD();
+  const open=getItensAbertos();
+  const matches=d.filter(t=>t.status==='match'&&t.debito>0);
+  // rets: usar filtData para contar retenções do período/conta filtrada
+  const rets=filtData.filter(t=>t.status==='ret'&&t.debito>0);
+  document.getElementById('m-tot').textContent=d.length.toLocaleString('pt-BR');
+  document.getElementById('m-match').textContent=matches.length.toLocaleString('pt-BR');
+  document.getElementById('m-open').textContent=open.length.toLocaleString('pt-BR');
+  document.getElementById('m-oval').textContent=fBRL(open.reduce((s,t)=>s+(t.saldo_aberto||t.debito||0),0));
+  document.getElementById('m-ret').textContent=rets.length.toLocaleString('pt-BR');
+  document.getElementById('m-rval').textContent=fBRL(rets.reduce((s,t)=>s+t.ret_val,0));
+}
+
+// ── ACCOUNT LIST ──────────────────────────────────────────────────────────
+function renderAccList(){
+  const m={};
+  filtData.forEach(t=>{if(!t.conta_cod)return;if(!m[t.conta_cod])m[t.conta_cod]={cod:t.conta_cod,desc:t.conta_desc,open:0,total:0};m[t.conta_cod].total++;if(t.is_open_account&&(t.status==='open'||t.status==='partial'))m[t.conta_cod].open++;});
+  const sorted=Object.values(m).sort((a,b)=>b.open-a.open||a.cod.localeCompare(b.cod));
+  const list=document.getElementById('acclist');list.innerHTML='';
+  sorted.slice(0,120).forEach(c=>{
+    const div=document.createElement('div');div.className='acc-item';
+    div.innerHTML=`<span class="acc-code">${c.cod}</span><span class="acc-name">${c.desc}</span>${c.open>0?`<span class="acc-bdg bdg-open">${c.open} aberto(s)</span>`:'<span class="acc-bdg bdg-ok">ok</span>'}`;
+    div.onclick=()=>{document.querySelectorAll('.acc-item').forEach(i=>i.classList.remove('active'));div.classList.add('active');document.getElementById('tf-conta').value=c.cod;document.getElementById('f-conta').value=c.cod;tfAplicar();};
+    list.appendChild(div);
+  });
+}
+
+// ── RESUMO ────────────────────────────────────────────────────────────────
+function renderResumo(){
+  const d=filtData;
+  const tD=d.reduce((s,t)=>s+t.debito,0),tC=d.reduce((s,t)=>s+t.credito,0);
+  const open=getItensAbertos();
+  // rets: usar filtData para contar retenções do período/conta filtrada
+  const rets=filtData.filter(t=>t.status==='ret'&&t.debito>0);
+  const mPares=pares.filter(p=>p.tipo==='match');
+  document.getElementById('sgrid').innerHTML=`
+    <div class="scard"><h3>Débito Total</h3><div class="v success">${fBRL(tD)}</div><div class="sv">${d.filter(t=>t.debito>0).length.toLocaleString('pt-BR')} lançamentos</div></div>
+    <div class="scard"><h3>Crédito Total</h3><div class="v danger">${fBRL(tC)}</div><div class="sv">${d.filter(t=>t.credito>0).length.toLocaleString('pt-BR')} lançamentos</div></div>
+    <div class="scard"><h3>Match NF / Recebimento</h3><div class="v success">${mPares.length} pares</div><div class="sv">${fBRL(mPares.reduce((s,p)=>s+p.vl_nf,0))}</div></div>
+    <div class="scard"><h3>Em Aberto</h3><div class="v danger">${open.length} itens</div><div class="sv">${fBRL(open.reduce((s,t)=>s+(t.saldo_aberto||0),0))}</div></div>
+    <div class="scard"><h3>Retenções (NF vs Rec.)</h3><div class="v ret">${rets.length} ocorr.</div><div class="sv">${fBRL(rets.reduce((s,t)=>s+t.ret_val,0))} retidos</div></div>
+    <div class="scard"><h3>Saldos de Abertura</h3><div class="v warn">${Object.keys(saldosAbertura).length>0?Object.keys(saldosAbertura).length+' conta(s)':'Não informado'}</div><div class="sv">${Object.keys(saldosAbertura).length>0?'ref. 31/12/2025 — '+fBRL(Object.values(saldosAbertura).reduce((s,v)=>s+v,0)):'Informe no campo acima'}</div></div>`;
+  const gm={};open.forEach(t=>{const k=(t.conta_cod||'?').substring(0,5);if(!gm[k])gm[k]={n:0,v:0};gm[k].n++;gm[k].v+=(t.saldo_aberto||0);});
+  const gl={'1.1.2':'Aplic. Financeiras','1.1.3':'A Receber','2.1.2':'Fornecedores','2.1.3':'Obrig. Trabalhistas','2.1.4':'Obrig. Tributárias','2.1.5':'Outras c/ Pagar'};
+  let h='<table style="width:100%"><thead><tr><th>Grupo de Conta</th><th>Qtd. Em Aberto</th><th>Valor em Aberto</th></tr></thead><tbody>';
+  Object.entries(gm).sort((a,b)=>b[1].v-a[1].v).forEach(([k,v])=>{h+=`<tr><td><strong>${gl[k]||k}</strong> <span class="tag">${k}</span></td><td class="mo rt">${v.n}</td><td class="mo rt warn">${fBRL(v.v)}</td></tr>`;});
+  document.getElementById('stbl').innerHTML=h+'</tbody></table>';
+}
+
+// ── CONCILIAÇÃO ───────────────────────────────────────────────────────────
+function renderConcil(){
+  const d=getVD();const tb=document.getElementById('tb-concil');
+  if(!d.length){tb.innerHTML='<tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--text3)">Nenhum lançamento encontrado. Aplique os filtros acima.</td></tr>';return;}
+
+  const conta = getContaFiltrada();
+  const saldoRows = buildSaldoRows(conta);
+  const hasSaldo  = conta && saldosAbertura[conta] !== undefined;
+
+  // Calcular saldo corrente acumulado
+  // Ativo: começa positivo, créditos reduzem → saldo = ant + deb - cred
+  // Passivo: começa positivo (valor a pagar), débitos reduzem → saldo = ant - deb + cred
+  const nat = getNatureza(conta);
+  let saldoCorrente = hasSaldo ? saldosAbertura[conta] : 0;
+
+  let html = '';
+
+  // ── Linha(s) de saldo de abertura + composição ──
+  // saldoCorrente já começa com o valor de abertura (ou 0)
+  // A cada linha: Saldo = Saldo anterior + Débito - Crédito
+
+  saldoRows.forEach((sr) => {
+    if (sr._tipo === 'saldo_header') {
+      const sc = saldoCorrente < 0 ? 'color:var(--danger)' : 'color:var(--warn)';
+      const natH = getNatureza(sr.conta);
+      const isPassH = natH === 'passivo';
+      html += `<tr style="background:#fff3cd;font-weight:bold;border-left:4px solid #c47a00;">
+        <td class="mo" style="color:var(--warn)">${sr.data_str}</td>
+        <td class="mo" style="color:var(--warn)">—</td>
+        <td style="color:var(--warn);font-size:12px" colspan="2">SALDO DE ABERTURA (${isPassH?'PASSIVO':'ATIVO'})</td>
+        <td style="font-size:11px;color:var(--text3)">Saldo inicial — ${isPassH?'crédito':'débito'}</td>
+        <td class="rt mo ${isPassH?'':'warn'}">${isPassH?'—':fBRL(sr.debito)}</td>
+        <td class="rt mo ${isPassH?'warn':''}">${isPassH?fBRL(sr.credito):'—'}</td>
+        <td class="rt mo" style="${sc};font-weight:bold">${fBRL(saldoCorrente)}</td>
+        <td><span class="sb sb-ant">Saldo ant.</span></td>
+        <td style="font-size:10px;color:var(--text3)">31/12/2025</td>
+        <td></td>
+      </tr>`;
+    } else {
+      // Acumula no saldo: composição sempre SOMA (independe da natureza)
+      // pois representa obrigações já existentes (ativo: a receber; passivo: a pagar)
+      saldoCorrente = saldoCorrente + (sr.debito || sr.credito);
+      const sc = saldoCorrente < 0 ? 'color:var(--danger)' : 'color:var(--warn)';
+      const natC = getNatureza(sr.conta);
+      const isPassC = natC === 'passivo';
+      const statusComp = sr.status === 'anterior'
+        ? `<span class="sb sb-ant">${isPassC?'Pago':'Recebido'}</span>`
+        : `<span class="sb sb-open">Em aberto</span>`;
+      // Mostrar valor no lado correto
+      const vlComp = sr.debito || sr.credito;
+      html += `<tr style="background:#fffbf0;border-left:4px solid #e8d88a;">
+        <td class="mo" style="font-size:10px;color:var(--text3)">${sr.data_str}</td>
+        <td class="mo" style="color:var(--info);font-size:11px;font-weight:bold">${sr.nf}</td>
+        <td style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" colspan="2">${sr.razao}</td>
+        <td style="font-size:10px;color:var(--text3)">Composição saldo anterior</td>
+        <td class="rt mo deb">${isPassC?'—':fBRL(vlComp)}</td>
+        <td class="rt mo cred">${isPassC?fBRL(vlComp):'—'}</td>
+        <td class="rt mo" style="${sc};font-weight:bold">${fBRL(saldoCorrente)}</td>
+        <td>${statusComp}</td>
+        <td style="font-size:10px;color:var(--text3)">${sr.match_status||'Saldo anterior'}</td>
+        <td></td>
+      </tr>`;
+    }
+  });
+
+  // ── Lançamentos do período com saldo acumulado ──
+  // Fórmula: Saldo = Saldo anterior + Débito - Crédito (acumulado linha a linha)
+  const slice = d.slice(0, 500);
+  slice.forEach(t => {
+    if (hasSaldo) {
+      // Ativo (devedor):  Saldo = ant + Débito - Crédito
+      // Passivo (credor): Saldo = ant - Débito + Crédito
+      if(nat === 'passivo'){
+        saldoCorrente = saldoCorrente - t.debito + t.credito;
+      } else {
+        saldoCorrente = saldoCorrente + t.debito - t.credito;
+      }
+    }
+    const saldoColor = saldoCorrente < 0 ? 'color:var(--danger)' : saldoCorrente > 0 ? 'color:var(--warn)' : 'color:var(--accent)';
+    const saldoCell = hasSaldo
+      ? `<td class="rt mo" style="${saldoColor};font-weight:bold">${fBRL(saldoCorrente)}</td>`
+      : `<td class="rt mo ${t.saldo_aberto>0?'warn':''}">${t.saldo_aberto>0?fBRL(t.saldo_aberto):'—'}</td>`;
+
+    html += `<tr class="${rClass(t)}">
+      <td class="mo">${fDate(t.data)}</td>
+      <td class="mo" style="font-weight:bold;color:var(--info)">${t.nf||'—'}</td>
+      <td class="rcell">${t.razao_social||'—'}</td>
+      <td class="mo" style="font-size:10px">${t.conta_cod||''}</td>
+      <td class="hcell">${t.historico}</td>
+      <td class="rt mo deb">${t.debito>0?fBRL(t.debito):'—'}</td>
+      <td class="rt mo cred">${t.credito>0?fBRL(t.credito):'—'}</td>
+      ${saldoCell}
+      <td>${sBadge(t)}</td>
+      <td style="font-size:10px;color:var(--text3)">${t.match_status||''}</td>
+      <td></td>
+    </tr>`;
+  });
+
+  tb.innerHTML = html;
+  if(d.length>500) tb.innerHTML+=`<tr><td colspan="11" style="text-align:center;font-size:11px;color:var(--text3);padding:.5rem">Exibindo 500 de ${d.length}. Use filtros para refinar.</td></tr>`;
+}
+
+// ── EM ABERTO ─────────────────────────────────────────────────────────────
+// Retorna todos os itens genuinamente em aberto:
+// open, partial, ret com saldo residual, anterior com saldo residual
+// + itens da composição que não foram compensados no período
+function getItensAbertos(){
+  const conta = getContaFiltrada();
+  const q = (document.getElementById('srch').value||'').toLowerCase();
+
+  // 1. Lançamentos do razão que estão em aberto
+  let base = filtData.filter(t =>
+    t.is_open_account && (
+      t.status === 'open' ||
+      t.status === 'partial' ||
+      (t.status === 'ret'      && (t.saldo_aberto||0) > 0.009) ||
+      (t.status === 'anterior' && (t.saldo_aberto||0) > 0.009)
+    )
+  );
+
+  // 2. Itens da composição não compensados (virtuais — não estão no allData)
+  const comp = composicaoItens[conta];
+  if (comp && comp.length) {
+    // NFs que foram efetivamente recebidas no período (créditos marcados como anterior)
+    const nfsCasadas = new Set(
+      allData.filter(t => t._was_ant && t.conta_cod === conta && t.credito > 0)
+             .map(t => t.nf).filter(Boolean)
+    );
+    const valCasados = new Set(
+      allData.filter(t => t._was_ant && t.conta_cod === conta && t.credito > 0 && !t.nf)
+             .map(t => t.credito)
+    );
+
+    comp.forEach(it => {
+      const casado = (it.nf && nfsCasadas.has(it.nf)) ||
+                     (!it.nf && valCasados.has(it.valor));
+      if (!casado) {
+        base.push({
+          _virtual: true,
+          data: new Date('2025-12-31T00:00:00'),
+          nf: it.nf || '—',
+          razao_social: it.razao || '—',
+          conta_cod: conta,
+          conta_desc: allData.find(x=>x.conta_cod===conta)?.conta_desc || '',
+          historico: 'Composição saldo ant.' + (it.nf ? ' NF '+it.nf : ''),
+          debito: it.valor,
+          credito: 0,
+          saldo_aberto: it.valor,
+          status: 'open',
+          match_status: 'Saldo anterior pendente',
+          is_open_account: true
+        });
+      }
+    });
+  }
+
+  // 3. Aplicar busca textual
+  if (q) base = base.filter(t =>
+    (t.historico||'').toLowerCase().includes(q) ||
+    (t.conta_cod||'').toLowerCase().includes(q) ||
+    (t.nf||'').toLowerCase().includes(q) ||
+    (t.razao_social||'').toLowerCase().includes(q)
+  );
+
+  return base;
+}
+
+function renderAbertos(){
+  const d = getItensAbertos();
+  const tb = document.getElementById('tb-abertos');
+  if(!d.length){
+    tb.innerHTML='<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--text3)">Nenhum item em aberto.</td></tr>';
+    return;
+  }
+
+  // Totalizador no rodapé
+  const totalAberto = d.reduce((s,t)=>s+(t.saldo_aberto||t.debito||0),0);
+
+  tb.innerHTML = d.slice(0,1000).map(t=>`<tr class="r-open">
+    <td class="mo">${fDate(t.data)}</td>
+    <td class="mo" style="font-weight:bold;color:var(--info)">${t.nf||'—'}</td>
+    <td class="rcell">${t.razao_social||'—'}</td>
+    <td class="mo" style="font-size:10px">${t.conta_cod||''}</td>
+    <td class="hcell">${t.historico}</td>
+    <td class="rt mo deb">${t.debito>0?fBRL(t.debito):'—'}</td>
+    <td class="rt mo cred">${t.credito>0?fBRL(t.credito):'—'}</td>
+    <td class="rt mo warn">${fBRL(t.saldo_aberto||t.debito||t.credito)}</td>
+    <td>${sBadge(t)}</td>
+  </tr>`).join('') +
+  `<tr style="background:var(--surface2);font-weight:bold;border-top:2px solid var(--border);">
+    <td colspan="7" style="text-align:right;font-size:11px;color:var(--text2);padding:8px 9px;">TOTAL EM ABERTO</td>
+    <td class="rt mo warn" style="font-size:13px;">${fBRL(totalAberto)}</td>
+    <td></td>
+  </tr>`;
+
+  if(d.length>1000) tb.innerHTML+=`<tr><td colspan="9" style="text-align:center;font-size:11px;color:var(--text3);padding:.5rem">Exibindo 1000 de ${d.length}.</td></tr>`;
+}
+
+// ── RETENÇÕES ─────────────────────────────────────────────────────────────
+function renderRet(){
+  // Filtrar retenções apenas das contas/período presentes no filtData atual
+  const contasVisiveis = new Set(filtData.map(t=>t.conta_cod).filter(Boolean));
+  const datasVisiveis  = filtData.map(t=>t.data).filter(Boolean);
+  const dtMin = datasVisiveis.length ? new Date(Math.min(...datasVisiveis)) : null;
+  const dtMax = datasVisiveis.length ? new Date(Math.max(...datasVisiveis)) : null;
+
+  const rp = pares.filter(p =>
+    p.tipo === 'ret' &&
+    contasVisiveis.has(p.conta) &&
+    (!dtMin || p.data_nf >= dtMin) &&
+    (!dtMax || p.data_nf <= dtMax)
+  );
+  const tb=document.getElementById('tb-ret');
+  if(!rp.length){tb.innerHTML='<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--text3)">Nenhuma retenção identificada.</td></tr>';return;}
+  tb.innerHTML=rp.map(p=>`<tr class="r-ret">
+    <td class="mo">${fDate(p.data_nf)}</td>
+    <td class="mo">${fDate(p.data_rec)}</td>
+    <td class="mo" style="font-weight:bold;color:var(--info)">${p.nf_num||'—'}</td>
+    <td class="rcell">${p.razao||'—'}</td>
+    <td class="mo" style="font-size:10px">${p.conta}</td>
+    <td class="rt mo deb">${fBRL(p.vl_nf)}</td>
+    <td class="rt mo cred">${fBRL(p.vl_rec)}</td>
+    <td class="rt mo" style="color:var(--ret);font-weight:bold">${fBRL(p.diferenca)}</td>
+    <td class="rt mo" style="color:var(--ret)">${p.pct.toFixed(2)}%</td>
+  </tr>`).join('');
+}
+
+// ── RAZÃO COMPLETO ────────────────────────────────────────────────────────
+function renderRazao(){
+  const d=getVD();const tb=document.getElementById('tb-razao');
+  if(!d.length){tb.innerHTML='<tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--text3)">Nenhum dado.</td></tr>';return;}
+  tb.innerHTML=d.slice(0,300).map(t=>`<tr class="${rClass(t)}">
+    <td class="mo">${fDate(t.data)}</td>
+    <td class="mo" style="font-size:10px">${t.lote_doc.substring(0,12)}</td>
+    <td class="mo" style="font-weight:bold;color:var(--info)">${t.nf||'—'}</td>
+    <td class="rcell">${t.razao_social||'—'}</td>
+    <td class="mo" style="font-size:10px">${t.conta_cod||''}</td>
+    <td class="hcell">${t.historico}</td>
+    <td class="mo" style="font-size:10px">${t.filial||'—'}</td>
+    <td class="rt mo deb">${t.debito>0?fBRL(t.debito):'—'}</td>
+    <td class="rt mo cred">${t.credito>0?fBRL(t.credito):'—'}</td>
+    <td class="mo" style="font-size:10px">${t.saldo_str||'—'}</td>
+    <td>${sBadge(t)}</td>
+  </tr>`).join('');
+  if(d.length>300)tb.innerHTML+=`<tr><td colspan="11" style="text-align:center;font-size:11px;color:var(--text3);padding:.5rem">Exibindo 300 de ${d.length}.</td></tr>`;
+}
+
+// ── POR CONTA ─────────────────────────────────────────────────────────────
+function renderContas(){
+  const cm={};
+  filtData.forEach(t=>{const k=t.conta_cod;if(!k)return;if(!cm[k])cm[k]={cod:k,desc:t.conta_desc,n:0,deb:0,cred:0,open:0,vo:0,ret:0,vr:0,is_ctrl:t.is_open_account};cm[k].n++;cm[k].deb+=t.debito;cm[k].cred+=t.credito;if(t.is_open_account&&(t.status==='open'||t.status==='partial')){cm[k].open++;cm[k].vo+=(t.saldo_aberto||0);}if(t.status==='ret'&&t.debito>0){cm[k].ret++;cm[k].vr+=t.ret_val;}});
+  const tp=cod=>{if(!cod)return'';if(cod.startsWith('1.1.2'))return'<span class="tag r">Aplicação</span>';if(cod.startsWith('1.1.3'))return'<span class="tag r">A Receber</span>';if(cod.startsWith('2.1'))return'<span class="tag p">A Pagar</span>';if(cod.startsWith('1.1.1'))return'<span class="tag">Banco</span>';return'<span class="tag">Outro</span>';};
+  document.getElementById('tb-contas').innerHTML=Object.values(cm).sort((a,b)=>b.vo-a.vo).map(c=>`<tr>
+    <td class="mo" style="font-size:10px">${c.cod}</td><td style="font-size:11px">${c.desc}</td><td>${tp(c.cod)}</td>
+    <td class="mo rt">${c.n}</td>
+    <td class="mo rt deb">${fBRL(c.deb)}</td>
+    <td class="mo rt cred">${fBRL(c.cred)}</td>
+    <td class="mo rt ${(c.deb-c.cred)>=0?'deb':'cred'}">${fBRL(c.deb-c.cred)}</td>
+    <td class="mo rt">${c.open}</td>
+    <td class="mo rt warn">${c.vo>0?fBRL(c.vo):'—'}</td>
+    <td class="mo rt" style="color:var(--ret)">${c.ret||'—'}</td>
+    <td class="mo rt" style="color:var(--ret)">${c.vr>0?fBRL(c.vr):'—'}</td>
+    <td>${c.open>0?'<span class="sb sb-open">Pendências</span>':c.is_ctrl?'<span class="sb sb-closed">OK</span>':'<span class="sb sb-na">N/A</span>'}</td>
+  </tr>`).join('');
+}
+
+// ── SHOW PANEL ────────────────────────────────────────────────────────────
+function showP(n){
+  const ps=['resumo','concil','abertos','ret','razao','contas','resultado','diverg','validfin'];
+  ps.forEach(p=>{const el=document.getElementById('panel-'+p);if(el)el.style.display=p===n?'':('none');});
+  document.querySelectorAll('.ptab').forEach((t,i)=>t.classList.toggle('active',ps[i]===n));
+}
+
+// ── SORT ─────────────────────────────────────────────────────────────────
+function sc(tbl,col){
+  const k=tbl+'_'+col;sortSt[k]=sortSt[k]==='asc'?'desc':'asc';const asc=sortSt[k]==='asc';
+  const fn={data:(a,b)=>asc?a.data-b.data:b.data-a.data,debito:(a,b)=>asc?a.debito-b.debito:b.debito-a.debito,credito:(a,b)=>asc?a.credito-b.credito:b.credito-a.credito}[col];
+  filtData.sort(fn);
+  if(tbl==='c')renderConcil();else if(tbl==='a')renderAbertos();else renderRazao();
+}
+
+// ── EXPORT ────────────────────────────────────────────────────────────────
+function expCSV(){
+  const d=getVD();
+  const h='Data,NF,Razão Social,Conta,Histórico,Débito,Crédito,Saldo Aberto,Status\n';
+  const r=d.map(t=>[fDate(t.data),t.nf,'"'+t.razao_social+'"',t.conta_cod,'"'+t.historico.replace(/"/g,'""')+'"',t.debito.toFixed(2),t.credito.toFixed(2),(t.saldo_aberto||0).toFixed(2),t.status].join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+h+r],{type:'text/csv;charset=utf-8'}));a.download='conciliacao.csv';a.click();
+}
+
+function expXLSX(){
+  const wb=XLSX.utils.book_new();
+  // Conciliação com saldo de abertura e saldo corrente
+  const d=getVD();
+  const conta=getContaFiltrada();
+  const sRows=buildSaldoRows(conta);
+  const hasSaldo=conta && saldosAbertura[conta]!==undefined;
+  let saldoCor=hasSaldo?saldosAbertura[conta]:0;
+  const r1=[['Data','NF','Razão Social','Conta','Descrição','Histórico','Débito','Crédito','Saldo','Status','Observação']];
+  // Linhas de saldo de abertura
+  if(hasSaldo){
+    const isPassHdr = getNatureza(conta)==='passivo';
+    r1.push(['31/12/2025','—','SALDO DE ABERTURA',conta,'','Saldo inicial do período',
+      isPassHdr?0:saldosAbertura[conta],
+      isPassHdr?saldosAbertura[conta]:0,
+      saldoCor,'anterior','Saldo informado em 31/12/2025']);
+    const comp=composicaoItens[conta];
+    if(comp){
+      const isPassXl = getNatureza(conta)==='passivo';
+      comp.forEach(it=>{
+        saldoCor = saldoCor + it.valor;
+        const dXl = isPassXl ? 0        : it.valor;
+        const cXl = isPassXl ? it.valor : 0;
+        r1.push([it.data_str||'31/12/2025',it.nf||'—',it.razao||'—',conta,'','Composição saldo anterior',dXl,cXl,saldoCor,'open','Saldo anterior']);
+      });
+    }
+  }
+  d.forEach(t=>{
+    if(hasSaldo){
+        const natX = getNatureza(conta);
+        saldoCor = natX==='passivo' ? saldoCor - t.debito + t.credito : saldoCor + t.debito - t.credito;
+      }
+    r1.push([fDate(t.data),t.nf,t.razao_social,t.conta_cod,t.conta_desc,t.historico,t.debito,t.credito,hasSaldo?saldoCor:(t.saldo_aberto||0),t.status,t.match_status]);
+  });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(r1),'Conciliação');
+  // Em Aberto — usa getItensAbertos() igual à aba da interface
+  const op=getItensAbertos();
+  const r2=[['Data','NF','Razão Social','Conta','Descrição','Histórico','Débito','Crédito','Saldo Aberto','Status','Observação']];
+  op.forEach(t=>r2.push([fDate(t.data),t.nf||'—',t.razao_social||'—',t.conta_cod,t.conta_desc||'',t.historico,t.debito,t.credito,t.saldo_aberto||t.debito||0,t.status,t.match_status||'']));
+  // Linha de total
+  const totalAb=op.reduce((s,t)=>s+(t.saldo_aberto||t.debito||0),0);
+  r2.push(['','','','','','','','TOTAL',totalAb,'','']);
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(r2),'Em Aberto');
+  // Retenções — filtrar pelo mesmo critério de filtData
+  const contasExp = new Set(filtData.map(t=>t.conta_cod).filter(Boolean));
+  const dtMinExp  = filtData.map(t=>t.data).filter(Boolean).reduce((a,b)=>a<b?a:b, new Date('2099-01-01'));
+  const dtMaxExp  = filtData.map(t=>t.data).filter(Boolean).reduce((a,b)=>a>b?a:b, new Date('2000-01-01'));
+  const rp=pares.filter(p=>
+    p.tipo==='ret' &&
+    contasExp.has(p.conta) &&
+    p.data_nf >= dtMinExp &&
+    p.data_nf <= dtMaxExp
+  );
+  const r3=[['Data NF','Data Rec.','NF','Razão Social','Conta','Vl. NF','Vl. Recebido','Vl. Retido','% Retenção']];
+  rp.forEach(p=>r3.push([fDate(p.data_nf),fDate(p.data_rec),p.nf_num,p.razao,p.conta,p.vl_nf,p.vl_rec,p.diferenca,p.pct.toFixed(2)+'%']));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(r3),'Retenções');
+  // Saldo Anterior
+  if(Object.keys(saldosAbertura).length>0){
+    const an=allData.filter(t=>t.status==='anterior');
+    const r4=[['Conta','Saldo Abertura (31/12/2025)'],...Object.entries(saldosAbertura).map(([c,v])=>{const tx=allData.find(x=>x.conta_cod===c);return[c+(tx?' — '+tx.conta_desc:''),v];}),[''],['Data','NF','Razão Social','Conta','Histórico','Crédito','Observação']];
+    an.forEach(t=>r4.push([fDate(t.data),t.nf,t.razao_social,t.conta_cod,t.historico,t.credito,t.match_status]));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(r4),'Saldo Anterior');
+  }
+  XLSX.writeFile(wb,'conciliacao_contabil.xlsx');
+}
+// ── COMPOSIÇÃO DO SALDO DE ABERTURA ──────────────────────────────────────
+function loadComposicao(input) {
+  const conta = getContaFiltrada();
+  if (!conta) { alert('Selecione uma conta contábil primeiro.'); return; }
+  const file = input.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      let items = [];
+      let contasNoArquivo = []; // declarado aqui para ficar acessível após o if/else
+      if (file.name.endsWith('.csv')) {
+        // Parse CSV simples
+        const lines = e.target.result.split('\n').filter(l=>l.trim());
+        const header = lines[0].split(';').map(h=>h.trim().toLowerCase());
+        // Suporta separador ; ou ,
+        const sep = lines[0].includes(';') ? ';' : ',';
+        const hdr = lines[0].split(sep).map(h=>h.replace(/"/g,'').trim().toLowerCase());
+        const iContaCSV = hdr.indexOf('conta');
+        if (iContaCSV >= 0) {
+          contasNoArquivo = [...new Set(
+            lines.slice(1)
+              .map(l => l.split(sep)[iContaCSV]?.replace(/"/g,'').trim())
+              .filter(v => v && v !== 'Conta')
+          )];
+          // Validar se a conta selecionada está no arquivo
+          if (contasNoArquivo.length > 0 && !contasNoArquivo.includes(conta)) {
+            alert('⚠ Atenção: este arquivo contém as contas:\n' + contasNoArquivo.join(', ') +
+                  '\n\nA conta selecionada (' + conta + ') não está no arquivo.' +
+                  '\nVerifique se carregou o arquivo correto para esta conta.');
+            input.value = '';
+            return;
+          }
+        }
+        for (let i=1;i<lines.length;i++) {
+          const cols = lines[i].split(sep).map(c=>c.replace(/"/g,'').trim());
+          if (!cols.join('')) continue;
+          // Filtrar pela conta selecionada se arquivo tiver coluna conta
+          if (iContaCSV >= 0 && cols[iContaCSV] && cols[iContaCSV] !== conta) continue;
+          const getNF  = () => cols[hdr.indexOf('nf')] || cols[hdr.indexOf('nota')] || cols[hdr.indexOf('numero')] || cols[0] || '';
+          const getRS  = () => cols[hdr.indexOf('razao')] || cols[hdr.indexOf('cliente')] || cols[hdr.indexOf('fornecedor')] || cols[1] || '';
+          const getVl  = () => parseFloat((cols[hdr.indexOf('valor')] || cols[hdr.indexOf('saldo')] || cols[2] || '0').replace(/\./g,'').replace(',','.')) || 0;
+          const getDt  = () => cols[hdr.indexOf('data')] || cols[hdr.indexOf('vencimento')] || '31/12/2025';
+          items.push({ nf: getNF(), razao: getRS(), valor: getVl(), data_str: getDt() });
+        }
+      } else {
+        // Parse XLSX
+        const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+        if (rows.length < 2) { alert('Planilha vazia ou sem dados.'); return; }
+        const hdr = rows[0].map(h=>String(h).toLowerCase().trim());
+        const ci  = h => hdr.findIndex(x=>x.includes(h));
+        const iNF    = ci('nf')    >= 0 ? ci('nf')    : ci('nota')   >= 0 ? ci('nota')   : ci('num')     >= 0 ? ci('num')     : 0;
+        const iRS    = ci('razao') >= 0 ? ci('razao') : ci('client') >= 0 ? ci('client') : ci('fornec')   >= 0 ? ci('fornec')   : 1;
+        const iVl    = ci('valor') >= 0 ? ci('valor') : ci('saldo')  >= 0 ? ci('saldo')  : ci('montante') >= 0 ? ci('montante') : 2;
+        const iDt    = ci('data')  >= 0 ? ci('data')  : ci('venc')   >= 0 ? ci('venc')   : -1;
+        // ── Detectar coluna de conta contábil ──
+        // Se o arquivo tiver coluna "conta", filtrar apenas linhas da conta selecionada
+        const iConta = ci('conta') >= 0 ? ci('conta') : -1;
+        contasNoArquivo = iConta >= 0
+          ? [...new Set(rows.slice(1).map(r=>String(r[iConta]||'').trim()).filter(v=>v&&v!=='Conta'))]
+          : [];
+        const temMultiContas = contasNoArquivo.length > 1;
+
+        // Avisar se arquivo tem múltiplas contas e filtrar pela conta selecionada
+        if (temMultiContas) {
+          const contasStr = contasNoArquivo.join(', ');
+          if (!contasNoArquivo.includes(conta)) {
+            alert('⚠ Atenção: este arquivo contém as contas:\n' + contasStr +
+                  '\n\nA conta selecionada (' + conta + ') não está no arquivo.' +
+                  '\nVerifique se carregou o arquivo correto para esta conta.');
+            input.value = '';
+            return;
+          }
+          console.log('Arquivo com múltiplas contas. Filtrando pela conta:', conta);
+        }
+
+        for (let i=1;i<rows.length;i++) {
+          const r = rows[i];
+          if (!r.join('')) continue;
+
+          // Se arquivo tem coluna conta: filtrar apenas linhas da conta selecionada
+          if (iConta >= 0) {
+            const contaLinha = String(r[iConta]||'').trim();
+            if (contaLinha && contaLinha !== 'Conta' && contaLinha !== conta) continue;
+          }
+
+          const vlRaw = r[iVl];
+          const vl = typeof vlRaw==='number' ? vlRaw : parseFloat(String(vlRaw).replace(/\./g,'').replace(',','.')) || 0;
+          let dtStr = '31/12/2025';
+          if (iDt >= 0 && r[iDt]) {
+            dtStr = r[iDt] instanceof Date ? r[iDt].toLocaleDateString('pt-BR') : String(r[iDt]);
+          }
+          items.push({ nf: String(r[iNF]||'').trim(), razao: String(r[iRS]||'').trim(), valor: vl, data_str: dtStr });
+        }
+      }
+
+      items = items.filter(it => it.valor > 0);
+      if (!items.length) { alert('Nenhum item válido encontrado. Verifique o arquivo.\nColunas esperadas: NF, Razão Social, Valor, Data (opcional).'); return; }
+
+      composicaoItens[conta] = items;
+
+      // Atualizar label
+      document.getElementById('comp-lbl').style.display='inline';
+      const temFiltro = items.length > 0 && contasNoArquivo && contasNoArquivo.length > 1;
+      document.getElementById('comp-lbl').textContent = items.length + ' itens carregados para conta ' + conta;
+      document.getElementById('comp-clear-btn').style.display='inline';
+
+      // Calcular total da composição
+      const total = items.reduce((s,it)=>s+it.valor,0);
+
+      // Se não há saldo manual, preencher com total da composição
+      if (!saldosAbertura[conta]) {
+        saldosAbertura[conta] = total;
+        document.getElementById('saldo-in').value = total.toFixed(2);
+      }
+
+      // Sempre reaplicar com a lógica de composição ativa
+      // (resetar marcações anteriores e recasar com itens da composição)
+      allData.forEach(t=>{if(t._was_ant&&t.conta_cod===conta){t.status=t._orig_st||'open';t._was_ant=false;t.match_status='';}});
+      aplicarSaldo();
+    } catch(err) {
+      alert('Erro ao processar arquivo: ' + err.message);
+    }
+    input.value = '';
+  };
+
+  if (file.name.endsWith('.csv')) reader.readAsText(file, 'utf-8');
+  else reader.readAsArrayBuffer(file);
+}
+
+function clearComposicao() {
+  const conta = getContaFiltrada();
+  if (!conta) return;
+  delete composicaoItens[conta];
+  document.getElementById('comp-lbl').style.display='none';
+  document.getElementById('comp-clear-btn').style.display='none';
+  // Resetar marcações de anterior e reaplicar no modo global
+  allData.forEach(t=>{if(t._was_ant&&t.conta_cod===conta){t.status=t._orig_st||'open';t._was_ant=false;t.match_status='';}});
+  if (saldosAbertura[conta]) aplicarSaldo(); // reaplicar modo global
+  else renderAll();
+}
+
+// ── LINHA DE SALDO DE ABERTURA NA CONCILIAÇÃO ─────────────────────────────
+function buildSaldoRows(conta) {
+  if (!conta || saldosAbertura[conta] === undefined) return [];
+  const val = saldosAbertura[conta];
+  const nat = getNatureza(conta);
+  // Ativo (1.x): saldo é débito — composição vai no lado débito
+  // Passivo (2.x): saldo é crédito — composição vai no lado crédito
+  const isPassivo = nat === 'passivo';
+  const rows = [];
+
+  // Linha de cabeçalho do saldo de abertura
+  rows.push({
+    _tipo: 'saldo_header',
+    data_str: '31/12/2025',
+    nf: '—',
+    razao: 'SALDO DE ABERTURA',
+    conta,
+    debito:  isPassivo ? 0   : val,
+    credito: isPassivo ? val : 0,
+    saldo_aberto: val,
+    status: 'anterior',
+    match_status: 'Saldo inicial do período',
+    historico: 'Saldo de abertura informado',
+    is_open: true
+  });
+
+  // Itens da composição (se carregados)
+  const comp = composicaoItens[conta];
+  if (comp && comp.length) {
+    // Lado que é absorvido no período (reduz o saldo)
+    const absorveLado = isPassivo ? 'debito' : 'credito';
+    const casados = allData.filter(t => t._was_ant && t.conta_cod === conta && t[absorveLado] > 0);
+    const nfsCasadas    = new Set(casados.map(t => t.nf).filter(Boolean));
+    const valoresCasados = new Set(casados.map(t => t[absorveLado]));
+
+    comp.forEach(it => {
+      const foiCasadoPorNF  = it.nf && nfsCasadas.has(it.nf);
+      const foiCasadoPorVal = !it.nf && valoresCasados.has(it.valor);
+      const compensado = foiCasadoPorNF || foiCasadoPorVal;
+
+      rows.push({
+        _tipo: 'saldo_comp',
+        data_str: it.data_str || '31/12/2025',
+        nf: it.nf || '—',
+        razao: it.razao || '—',
+        conta,
+        // Passivo: composição é crédito; Ativo: composição é débito
+        debito:  isPassivo ? 0        : it.valor,
+        credito: isPassivo ? it.valor : 0,
+        saldo_aberto: compensado ? 0 : it.valor,
+        status: compensado ? 'anterior' : 'open',
+        match_status: compensado
+          ? (isPassivo ? 'Pago no período' : 'Recebido no período')
+          : (isPassivo ? 'Pendente de pagamento' : 'Pendente de recebimento'),
+        historico: 'Composição saldo ant. NF ' + (it.nf||''),
+        is_open: !compensado
+      });
+    });
+  }
+
+  return rows;
+}
+
+// ── RESULTADO FINAL ───────────────────────────────────────────────────────
+let resSort = {col:'data', asc:true};
+
+function buildResultado(){
+  // Usa getItensAbertos() como fonte única — garante consistência com aba Em Aberto
+  const items = getItensAbertos();
+
+  // Agrupar por chave: NF + conta (se tiver NF); senão lote_doc + conta
+  const groups = {};
+  items.forEach(t => {
+    const chave = (t.nf ? 'NF'+t.nf : 'DOC'+t.lote_doc) + '|' + t.conta_cod;
+    if (!groups[chave]) {
+      groups[chave] = {
+        data: t.data,
+        nf: t.nf || '—',
+        razao: t.razao_social || (t.historico.split(' - ').pop().trim()),
+        conta: t.conta_cod,
+        debito: 0,
+        credito: 0,
+        saldo: 0,
+        status: t.status,
+        obs: t.match_status || ''
+      };
+    }
+    const g = groups[chave];
+    g.debito  += t.debito;
+    g.credito += t.credito;
+    g.saldo   += (t.saldo_aberto || 0);
+    if (t.data > g.data) g.data = t.data; // usa data mais recente do grupo
+    // Prioridade de status: open > partial > ret > anterior
+    const pri = {open:4,partial:3,ret:2,anterior:1};
+    if ((pri[t.status]||0) > (pri[g.status]||0)) { g.status=t.status; g.obs=t.match_status||''; }
+  });
+
+  let rows = Object.values(groups);
+
+  // Ordenar
+  rows.sort((a,b) => {
+    const col = resSort.col;
+    let va = a[col], vb = b[col];
+    if (col==='data') { va=va||new Date(0); vb=vb||new Date(0); }
+    if (typeof va === 'string') return resSort.asc ? va.localeCompare(vb) : vb.localeCompare(va);
+    return resSort.asc ? (va-vb) : (vb-va);
+  });
+
+  // Calcular saldo acumulado
+  let acum = 0;
+  rows = rows.map(r => { acum += r.saldo; return {...r, acum}; });
+
+  return rows;
+}
+
+function renderResultado(){
+  const rows = buildResultado();
+  const tb = document.getElementById('tb-resultado');
+  if (!tb) return;
+
+  // Métricas do resultado
+  const totalSaldo = rows.reduce((s,r)=>s+r.saldo,0);
+  const totalDeb   = rows.reduce((s,r)=>s+r.debito,0);
+  const totalCred  = rows.reduce((s,r)=>s+r.credito,0);
+  const nClientes  = new Set(rows.map(r=>r.razao).filter(r=>r&&r!=='—')).size;
+  const mDiv = document.getElementById('res-metrics');
+  if (mDiv) mDiv.innerHTML = [
+    ['Itens em Aberto', rows.length, ''],
+    ['Clientes/Fornecedores', nClientes, ''],
+    ['Total Débito', fBRL(totalDeb), 'color:var(--accent)'],
+    ['Total Crédito', fBRL(totalCred), 'color:var(--danger)'],
+    ['Saldo Total em Aberto', fBRL(totalSaldo), 'color:var(--warn);font-weight:bold'],
+  ].map(([l,v,s])=>`<div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:.6rem 1rem;min-width:140px;">
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3)">${l}</div>
+    <div style="font-size:17px;font-family:var(--mono);${s}">${v}</div>
+  </div>`).join('');
+
+  if (!rows.length) {
+    tb.innerHTML='<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--text3)">Nenhum item em aberto no filtro atual.</td></tr>';
+    return;
+  }
+
+  const sbadge = s => {
+    if(s==='open')     return '<span class="sb sb-open">Em aberto</span>';
+    if(s==='partial')  return '<span class="sb sb-partial">Parcial</span>';
+    if(s==='ret')      return '<span class="sb sb-ret">Retenção</span>';
+    if(s==='anterior') return '<span class="sb sb-ant">Saldo ant.</span>';
+    return '<span class="sb sb-na">—</span>';
+  };
+
+  tb.innerHTML = rows.map(r => `<tr class="r-open">
+    <td class="mo">${fDate(r.data)}</td>
+    <td class="mo" style="font-weight:bold;color:var(--info)">${r.nf}</td>
+    <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px">${r.razao}</td>
+    <td class="mo" style="font-size:10px">${r.conta}</td>
+    <td class="rt mo deb">${r.debito>0?fBRL(r.debito):'—'}</td>
+    <td class="rt mo cred">${r.credito>0?fBRL(r.credito):'—'}</td>
+    <td class="rt mo" style="color:var(--warn);font-weight:bold">${fBRL(r.saldo)}</td>
+    <td>${sbadge(r.status)}</td>
+    <td style="font-size:10px;color:var(--text3)">${r.obs}</td>
+  </tr>`).join('');
+}
+
+function scRes(col){
+  resSort.asc = resSort.col===col ? !resSort.asc : true;
+  resSort.col = col;
+  renderResultado();
+}
+
+function expResultCSV(){
+  const rows = buildResultado();
+  const h = 'Data,NF,Razão Social,Conta,Valor NF (Déb.),Valor Rec. (Créd.),Saldo em Aberto,Status,Observação\n';
+  const r = rows.map(r=>[fDate(r.data),r.nf,'"'+r.razao+'"',r.conta,r.debito.toFixed(2),r.credito.toFixed(2),r.saldo.toFixed(2),r.status,'"'+(r.obs||'')+'"'].join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['\ufeff'+h+r],{type:'text/csv;charset=utf-8'}));
+  a.download='resultado_final_conciliacao.csv';a.click();
+}
+
+function expResultXLSX(){
+  const rows = buildResultado();
+  const wb = XLSX.utils.book_new();
+  const data = [['Data','Nº NF','Razão Social','Conta','Valor NF (Déb.)','Valor Rec. (Créd.)','Saldo em Aberto','Status','Observação']];
+  rows.forEach(r=>data.push([fDate(r.data),r.nf,r.razao,r.conta,r.debito,r.credito,r.saldo,r.status,r.obs||'']));
+  // Totais
+  data.push(['']);
+  data.push(['TOTAL','','','',
+    rows.reduce((s,r)=>s+r.debito,0),
+    rows.reduce((s,r)=>s+r.credito,0),
+    rows.reduce((s,r)=>s+r.saldo,0),'','']);
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  // Largura das colunas
+  ws['!cols'] = [{wch:12},{wch:8},{wch:30},{wch:18},{wch:15},{wch:15},{wch:15},{wch:12},{wch:25}];
+  XLSX.utils.book_append_sheet(wb,ws,'Resultado Final');
+  XLSX.writeFile(wb,'resultado_final_conciliacao.xlsx');
+}
+
+// ── DIVERGÊNCIAS ──────────────────────────────────────────────────────────
+// Mostra lançamentos sem contrapartida identificada:
+// 1. Créditos (recebimentos) cujas NFs NÃO têm débito correspondente no período
+//    → são recebimentos de NFs do saldo anterior não carregadas na composição
+// 2. Débitos cujas NFs NÃO têm crédito correspondente → já aparecem em Em Aberto
+//    mas são listados aqui também para cruzamento visual
+function getDivergencias(){
+  const items = [];
+  const conta = getContaFiltrada();
+
+  // NFs que têm DÉBITO no período filtrado
+  const nfsComDebito = new Set(
+    filtData.filter(t=>t.is_open_account && t.debito>0 && t.nf)
+            .map(t=>t.nf)
+  );
+  // NFs que têm CRÉDITO no período filtrado
+  const nfsComCredito = new Set(
+    filtData.filter(t=>t.is_open_account && t.credito>0 && t.nf)
+            .map(t=>t.nf)
+  );
+
+  filtData.filter(t=>t.is_open_account).forEach(t=>{
+    // Crédito sem débito correspondente no período
+    if(t.credito>0 && t.nf && !nfsComDebito.has(t.nf)){
+      items.push({...t, _divtipo:'Créd. s/ NF período', _divsit:'Possível saldo anterior não classificado'});
+    }
+    // Crédito sem NF identificada (histórico não reconhecido)
+    if(t.credito>0 && !t.nf && t.status!=='anterior'){
+      items.push({...t, _divtipo:'Créd. s/ NF', _divsit:'Histórico sem número de NF reconhecido'});
+    }
+    // Débito sem crédito e sem estar marcado como em aberto (status closed/na mas deveria estar aberto)
+    if(t.debito>0 && t.nf && !nfsComCredito.has(t.nf) && t.status==='closed'){
+      items.push({...t, _divtipo:'Déb. closed s/ rec.', _divsit:'Marcado como compensado mas sem crédito identificado'});
+    }
+  });
+
+  return items.sort((a,b)=>a.data-b.data);
+}
+
+function renderDiverg(){
+  const items = getDivergencias();
+  const tb = document.getElementById('tb-diverg');
+  if(!tb) return;
+
+  const credSemNF = items.filter(i=>i._divtipo.startsWith('Créd'));
+  const debClosed = items.filter(i=>i._divtipo.startsWith('Déb'));
+  const vlCredSem = credSemNF.reduce((s,t)=>s+t.credito,0);
+  const vlDebClosed= debClosed.reduce((s,t)=>s+t.debito,0);
+
+  const m = document.getElementById('diverg-metrics');
+  if(m) m.innerHTML=[
+    ['Créditos s/ NF período', credSemNF.length, 'var(--danger)'],
+    ['Valor créditos divergentes', fBRL(vlCredSem), 'var(--danger)'],
+    ['Débitos closed s/ recebimento', debClosed.length, 'var(--warn)'],
+    ['Valor débitos divergentes', fBRL(vlDebClosed), 'var(--warn)'],
+  ].map(([l,v,cor])=>`<div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:.6rem 1rem;min-width:160px;">
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3)">${l}</div>
+    <div style="font-size:17px;font-family:var(--mono);color:${cor}">${v}</div>
+  </div>`).join('');
+
+  if(!items.length){
+    tb.innerHTML='<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--accent)">✓ Nenhuma divergência encontrada — todos os lançamentos estão identificados.</td></tr>';
+    return;
+  }
+
+  tb.innerHTML = items.map(t=>`<tr class="${t.credito>0?'r-ant':'r-open'}">
+    <td class="mo">${fDate(t.data)}</td>
+    <td class="mo" style="font-weight:bold;color:var(--info)">${t.nf||'—'}</td>
+    <td class="rcell">${t.razao_social||'—'}</td>
+    <td class="mo" style="font-size:10px">${t.conta_cod||''}</td>
+    <td class="hcell">${t.historico}</td>
+    <td class="rt mo deb">${t.debito>0?fBRL(t.debito):'—'}</td>
+    <td class="rt mo cred">${t.credito>0?fBRL(t.credito):'—'}</td>
+    <td><span class="sb ${t.credito>0?'sb-ant':'sb-partial'}" style="white-space:nowrap">${t._divtipo}</span></td>
+    <td style="font-size:10px;color:var(--text2)">${t._divsit}</td>
+  </tr>`).join('');
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// VALIDAÇÃO FINANCEIRO
+// ══════════════════════════════════════════════════════════════════════════
+
+function loadFinanceiro(input, tipo) {
+  const file = input.files[0];
+  if (!file) return;
+  const lbl = document.getElementById('vf-'+tipo+'-lbl');
+  lbl.textContent = 'Carregando...';
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      let rows = [];
+      if (file.name.endsWith('.csv')) {
+        const lines = e.target.result.split('\n').filter(l=>l.trim());
+        const sep = lines[0].includes(';') ? ';' : ',';
+        const hdr = lines[0].split(sep).map(h=>h.replace(/"/g,'').trim().toLowerCase());
+        for (let i=1;i<lines.length;i++) {
+          const cols = lines[i].split(sep).map(c=>c.replace(/"/g,'').trim());
+          if (!cols.join('')) continue;
+          const obj = {};
+          hdr.forEach((h,j)=>obj[h]=cols[j]||'');
+          rows.push(obj);
+        }
+      } else {
+        const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+        // Detectar linha de cabeçalho (procurar linha com "cliente" ou "fornecedor" ou "nf" ou "parcela")
+        let hdrRow = 0;
+        for (let i=0;i<Math.min(raw.length,8);i++) {
+          const joined = raw[i].join(' ').toLowerCase();
+          if (joined.includes('cliente') || joined.includes('fornecedor') ||
+              joined.includes('parcela') || joined.includes('numero') || joined.includes('nf')) {
+            hdrRow = i; break;
+          }
+        }
+        const hdr = raw[hdrRow].map(h=>String(h).trim().toLowerCase());
+        for (let i=hdrRow+1;i<raw.length;i++) {
+          if (!raw[i].join('')) continue;
+          const obj = {};
+          hdr.forEach((h,j)=>obj[h]=raw[i][j]!==undefined?raw[i][j]:'');
+          rows.push(obj);
+        }
+      }
+
+      // Mapear campos: NF, cliente/fornecedor, valor, vencimento, emissao, status, dias
+      finData[tipo] = rows.map(r => {
+        // NF: extrair número do campo "Prf-Numero Parcela"
+        // Formato: "1  -000511   -", "NFS-002336   -", "RPS-019988   -", "UNI-001396   -"
+        // Regra: pegar o número entre o primeiro hífen e o segundo hífen
+        const nfRaw = r['prf-numero parcela'] || r['parcela'] || r['nf'] || r['numero'] || r['titulo'] || '';
+        const nfStr = String(nfRaw).trim();
+        // Padrão primário: PREFIXO-NUMERO- (ex: "1  -000511   -", "NFS-002336   -")
+        let nfM = nfStr.match(/^[A-Z0-9\s]+-\s*0*(\d+)\s*-/i);
+        // Padrão secundário: qualquer número com 3+ dígitos após hífen
+        if (!nfM) nfM = nfStr.match(/-\s*0*(\d{3,})/);
+        const nf = nfM ? String(parseInt(nfM[1],10)) : nfStr;
+
+        // Cliente/Fornecedor
+        const parteNome = r['codigo-lj-nome do cliente'] || r['codigo-lj-nome do fornecedor'] ||
+                          r['cliente'] || r['fornecedor'] || r['nome'] || '';
+        const parteStr = String(parteNome).trim();
+        // Formato: "000516-01-ABRAGET" ou "000516-01-036 - BR W3 CT"
+        // Extrair tudo após "XXXXXX-XX-"
+        let nomeM = parteStr.match(/^\d{6}-\d{2}-(.+)$/);
+        let nome = nomeM ? nomeM[1].trim() : parteStr;
+        // Se ainda tiver "036 - NOME", remover o código da loja
+        nome = nome.replace(/^\d{3}\s*-\s*/, '').trim();
+
+        // Valores
+        const vlOrig  = parseFloat(r['valor original']||r['valor']||r['vl original']||0)||0;
+        const vlVenc  = parseFloat(r['tit vencidos valor atual']||r['vencido']||0)||0;
+        const vlAVenc = parseFloat(r['titulos a vencer valor atual']||r['a vencer']||0)||0;
+        const vlAberto= vlOrig; // usar Valor Original conforme solicitado
+        const dias    = parseInt(r['dias atraso']||r['atraso']||0)||0;
+
+        // Datas
+        const dtEmissao = r['data de emissao'] || r['emissao'] || r['dt emissao'] || '';
+        const dtVencto  = r['vencto real'] || r['vencimento'] || r['vencto titulo'] || '';
+
+        const fmtD = d => {
+          if (!d) return '';
+          if (d instanceof Date) return d.toLocaleDateString('pt-BR');
+          const s = String(d);
+          const m = s.match(/(\d{4})-(\d{2})-(\d{2})/);
+          return m ? `${m[3]}/${m[2]}/${m[1]}` : s.substring(0,10);
+        };
+
+        return {
+          nf, nome, vlOrig, vlAberto, vlVenc, vlAVenc, dias,
+          dtEmissao: fmtD(dtEmissao), dtVencto: fmtD(dtVencto),
+          statusFin: vlVenc>0 ? 'Vencido' : 'A vencer',
+          _idx: nfStr+'|'+String(parteNome)+'|'+String(vlOrig),
+          _raw: r
+        };
+      }).filter(r => r.vlAberto > 0 || r.vlOrig > 0);
+
+      lbl.textContent = `✓ ${finData[tipo].length} títulos carregados — R$ ${fBRL(finData[tipo].reduce((s,r)=>s+r.vlAberto,0))}`;
+      popularSelectClientes();
+      renderValidFin();
+    } catch(err) {
+      lbl.textContent = '✗ Erro: ' + err.message;
+    }
+    input.value = '';
+  };
+
+  if (file.name.endsWith('.csv')) reader.readAsText(file,'utf-8');
+  else reader.readAsArrayBuffer(file);
+}
+
+function getValidFinData() {
+  const modulo   = document.getElementById('vf-modulo').value;
+  const finItens = finData[modulo] || [];
+  const vlLado   = modulo === 'rec' ? 'debito' : 'credito';
+
+  // Prefixos das contas de clientes/fornecedores
+  // Excluir contas de impostos (1.1.3=IRRF/INSS, 2.1.3=trab, 2.1.4=trib)
+  // pois o financeiro já mostra valor líquido (sem retenções)
+  const prefixos = modulo === 'rec'
+    ? ['1.1.2','1.1.4','1.2.1']
+    : ['2.1.2','2.1.5','2.2.1'];
+
+  // ── FONTE DO RAZÃO: itens em aberto de todas as subcontas ──────────────
+  // Usar allData (não filtData) para não depender do filtro de conta ativo
+  // getItensAbertos() usa filtData — aqui precisamos de tudo
+  const todosAbertos = allData.filter(t =>
+    t.is_open_account &&
+    prefixos.some(p => (t.conta_cod||'').startsWith(p)) &&
+    t[vlLado] > 0 &&
+    t.nf && t.nf !== '—' && t.nf !== '9999' && t.nf !== '99999' &&
+    // Excluir impostos retidos no histórico
+    !/(IRRF|INSS|ISS\s+S|PIS\s+S|COFINS)\s+S\/NF/i.test(t.historico||'') &&
+    // Excluir apenas itens totalmente compensados
+    t.status !== 'match' && t.status !== 'closed' && t.status !== 'na'
+  );
+
+  // Agrupar razão por NF + Conta (individual por subconta)
+  const razMap = {};
+  todosAbertos.forEach(t => {
+    const chave = t.nf + '||' + (t.conta_cod||'');
+    if (!razMap[chave]) razMap[chave] = {
+      nf: t.nf, nome: t.razao_social||'',
+      vlTotal: 0, conta: t.conta_cod||'', data: t.data
+    };
+    razMap[chave].vlTotal += (t.saldo_aberto > 0 ? t.saldo_aberto : t[vlLado]);
+    if (!razMap[chave].nome && t.razao_social) razMap[chave].nome = t.razao_social;
+  });
+
+  // ── Normalização de nome ───────────────────────────────────────────────
+  const norm = s => String(s||'').toUpperCase().trim()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[^A-Z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+
+  const simNome = (a, b) => {
+    const wa = new Set(norm(a).split(' ').filter(w=>w.length>2));
+    const wb = new Set(norm(b).split(' ').filter(w=>w.length>2));
+    if (!wa.size || !wb.size) return 0;
+    return [...wa].filter(w=>wb.has(w)).length / Math.max(wa.size, wb.size);
+  };
+
+  // ── Agrupar financeiro por NF (manter linhas individuais) ──────────────
+  const finPorNF = {};
+  finItens.filter(f => f.nf && f.vlAberto > 0).forEach((f, i) => {
+    if (!finPorNF[f.nf]) finPorNF[f.nf] = [];
+    // Garantir _idx único por linha
+    f._idx = f.nf + '||' + i;
+    finPorNF[f.nf].push(f);
+  });
+
+  // ── Cruzamento ────────────────────────────────────────────────────────
+  const resultado = [];
+  const finUsadas = new Set();
+
+  Object.values(razMap).forEach(r => {
+    const candidatos = (finPorNF[r.nf] || []).filter(f => !finUsadas.has(f._idx));
+    let melhor = null, melhorObs = '', melhorScore = -1;
+
+    candidatos.forEach(f => {
+      const diff = Math.abs(r.vlTotal - f.vlAberto);
+      const pct  = diff / Math.max(r.vlTotal, f.vlAberto, 1);
+      const sim  = simNome(r.nome, f.nome);
+
+      // Score de match: quanto maior melhor
+      // 4 = valor exato + nome similar
+      // 3 = valor exato + nome diferente (match por NF+Valor)
+      // 2 = retenção (<10%) + nome similar
+      // 1 = retenção (<10%) + qualquer nome
+      let score = 0;
+      if (diff < 0.05)       score = sim >= 0.3 ? 4 : 3;
+      else if (pct < 0.10)   score = sim >= 0.3 ? 2 : 1;
+      else if (pct < 0.20 && sim >= 0.5) score = 0; // fraco demais
+
+      if (score > melhorScore) {
+        melhorScore = score;
+        const pctStr = (pct*100).toFixed(1);
+        melhorObs = score >= 3 && sim < 0.3
+          ? 'Match NF+Valor — nomes: "'+r.nome+'" × "'+f.nome+'"'
+          : score <= 2
+            ? 'Retenção ~'+pctStr+'% — vl.razão='+fBRL(r.vlTotal)+' vl.fin='+fBRL(f.vlAberto)
+            : '';
+        melhor = f;
+      }
+    });
+
+    if (melhor && melhorScore >= 1) {
+      finUsadas.add(melhor._idx);
+      const diff = Math.abs(r.vlTotal - melhor.vlAberto);
+      resultado.push({
+        nf: r.nf, nome: r.nome || melhor.nome,
+        vlRaz: r.vlTotal, vlFin: melhor.vlAberto,
+        diff, obs: melhorObs,
+        situacao: diff < 0.05 ? 'concil' : 'diverg',
+        rowClass: diff < 0.05 ? 'r-concil' : 'r-diverg',
+        contas: r.conta,
+        dtEmissao: melhor.dtEmissao || (r.data ? fDate(r.data) : '—'),
+        dtVencto: melhor.dtVencto || '—',
+        dias: melhor.dias || 0, statusFin: melhor.statusFin || '—'
+      });
+    } else {
+      resultado.push({
+        nf: r.nf, nome: r.nome||'—',
+        vlRaz: r.vlTotal, vlFin: 0, diff: r.vlTotal,
+        situacao: 'so_razao', rowClass: 'r-so-razao',
+        contas: r.conta, obs: '',
+        dtEmissao: r.data ? fDate(r.data) : '—',
+        dtVencto: '—', dias: 0, statusFin: '—'
+      });
+    }
+  });
+
+  // Financeiro sem match
+  finItens.filter(f => f.nf && f.vlAberto > 0 && !finUsadas.has(f._idx)).forEach(f => {
+    resultado.push({
+      nf: f.nf, nome: f.nome, vlRaz: 0, vlFin: f.vlAberto,
+      diff: f.vlAberto, situacao: 'so_fin', rowClass: 'r-so-fin',
+      contas: '—', obs: '',
+      dtEmissao: f.dtEmissao||'—', dtVencto: f.dtVencto||'—',
+      dias: f.dias||0, statusFin: f.statusFin||'—'
+    });
+  });
+
+  return resultado.sort((a,b) => {
+    const ord = {diverg:0, so_razao:1, so_fin:2, concil:3};
+    return (ord[a.situacao]||9) - (ord[b.situacao]||9);
+  });
+}
+
+
+function renderValidFin() {
+  const tb = document.getElementById('tb-validfin');
+  const mDiv = document.getElementById('vf-metrics');
+  if (!tb) return;
+
+  const tipo     = document.getElementById('vf-tipo').value;
+  // Coletar clientes selecionados via checkboxes
+  const vfChecked = [...document.querySelectorAll('#vf-cliente-list input[type=checkbox]:checked')]
+    .map(cb => cb.value);
+  const vfCliente = vfChecked.length > 0 ? vfChecked : null; // null = todos
+  const vfNF      = (document.getElementById('vf-nf')?.value||'').toLowerCase().trim();
+  let rows = getValidFinData();
+  if (tipo !== 'all')  rows = rows.filter(r=>r.situacao===tipo);
+  if (vfCliente) rows = rows.filter(r => vfCliente.includes(r.nome||''));
+  if (vfNF)      rows = rows.filter(r=>String(r.nf||'').toLowerCase().includes(vfNF));
+
+  // Métricas
+  const all = getValidFinData();
+  const concil   = all.filter(r=>r.situacao==='concil');
+  const soRazao  = all.filter(r=>r.situacao==='so_razao');
+  const soFin    = all.filter(r=>r.situacao==='so_fin');
+  const diverg   = all.filter(r=>r.situacao==='diverg');
+
+  mDiv.innerHTML = [
+    ['✓ Conciliados', concil.length, fBRL(concil.reduce((s,r)=>s+r.vlRaz,0)), 'var(--accent)'],
+    ['⚠ Só no Razão', soRazao.length, fBRL(soRazao.reduce((s,r)=>s+r.vlRaz,0)), 'var(--warn)'],
+    ['⚠ Só no Financeiro', soFin.length, fBRL(soFin.reduce((s,r)=>s+r.vlFin,0)), 'var(--info)'],
+    ['✗ Valor Divergente', diverg.length, fBRL(diverg.reduce((s,r)=>s+r.diff,0)+' dif'), 'var(--danger)'],
+    ['Total NFs', all.length, '', 'var(--text2)'],
+  ].map(([l,n,v,cor])=>`<div class="vf-card">
+    <h3>${l}</h3>
+    <div class="v" style="color:${cor}">${n}</div>
+    <div class="sv">${v}</div>
+  </div>`).join('');
+
+  if (!rows.length) {
+    tb.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem;color:var(--text3)">Nenhum resultado. Carregue o arquivo financeiro e clique Validar.</td></tr>';
+    return;
+  }
+
+  const sbMap = {
+    concil:   '<span class="sb sb-concil">✓ Conciliado</span>',
+    so_razao: '<span class="sb sb-so-razao">⚠ Só Razão</span>',
+    so_fin:   '<span class="sb sb-so-fin">⚠ Só Financeiro</span>',
+    diverg:   '<span class="sb sb-diverg">✗ Divergente</span>',
+  };
+
+  tb.innerHTML = rows.map(r => `<tr class="${r.rowClass}">
+    <td class="mo" style="font-weight:bold;color:var(--info)">${r.nf}</td>
+    <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px">${r.nome}</td>
+    <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:var(--text3);font-family:var(--mono)">${r.contas||'—'}</td>
+    <td class="mo" style="font-size:11px">${r.dtEmissao}</td>
+    <td class="mo" style="font-size:11px">${r.dtVencto}</td>
+    <td class="rt mo ${r.vlRaz>0?'deb':''}">${r.vlRaz>0?fBRL(r.vlRaz):'—'}</td>
+    <td class="rt mo ${r.vlFin>0?'cred':''}">${r.vlFin>0?fBRL(r.vlFin):'—'}</td>
+    <td class="rt mo ${r.diff>0.04?'warn':''}">${r.diff>0.04?fBRL(r.diff):'—'}</td>
+    <td class="rt mo ${r.dias>0?'warn':''}">${r.dias>0?r.dias+' dias':'—'}</td>
+    <td style="font-size:11px;color:var(--text3)">${r.statusFin}</td>
+    <td>${sbMap[r.situacao]||''}</td>
+    <td style="font-size:10px;color:var(--text3);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||''}</td>
+  </tr>`).join('');
+}
+
+function expValidFin() {
+  const wb     = XLSX.utils.book_new();
+  const modulo = document.getElementById('vf-modulo').value;
+  const modLbl = modulo === 'rec' ? 'Contas a Receber' : 'Contas a Pagar';
+  const rows   = getValidFinData();
+  const now    = new Date();
+  const dtGer  = now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR');
+  const conta  = getContaFiltrada() || 'Todas as contas';
+  const periodo = (() => {
+    const i = document.getElementById('tf-ini')?.value || '';
+    const f = document.getElementById('tf-fim')?.value || '';
+    return i && f ? i + ' → ' + f : 'Período completo';
+  })();
+
+  // ── helpers de estilo ──────────────────────────────────────────────────
+  const fmtN = v => typeof v === 'number' ? v : 0;
+
+  // Cores por situação
+  const corSit = {
+    concil:   { fgRGB: '1A5C3A', bgRGB: 'E8F5EE' },
+    so_razao: { fgRGB: '8A4A00', bgRGB: 'FEF3E2' },
+    so_fin:   { fgRGB: '1A3A8A', bgRGB: 'E8EEFE' },
+    diverg:   { fgRGB: '8A1A1A', bgRGB: 'FDE8E8' },
+  };
+
+  const sitLabel = {
+    concil:   '✓ Conciliado',
+    so_razao: '⚠ Só no Razão',
+    so_fin:   '⚠ Só no Financeiro',
+    diverg:   '✗ Valor Divergente',
+  };
+
+  // ── métricas ──────────────────────────────────────────────────────────
+  const concil   = rows.filter(r=>r.situacao==='concil');
+  const soRazao  = rows.filter(r=>r.situacao==='so_razao');
+  const soFin    = rows.filter(r=>r.situacao==='so_fin');
+  const diverg   = rows.filter(r=>r.situacao==='diverg');
+  // Sub-classificar divergentes: retenção vs outros
+  const divRet   = diverg.filter(r=>(r.obs||'').toLowerCase().includes('reten'));
+  const divOutro = diverg.filter(r=>!(r.obs||'').toLowerCase().includes('reten'));
+
+  const sumVlRaz  = rows.reduce((s,r)=>s+r.vlRaz,0);
+  const sumVlFin  = rows.reduce((s,r)=>s+r.vlFin,0);
+  const sumDiff   = rows.reduce((s,r)=>s+r.diff,0);
+  const pctConcil = rows.length ? (concil.length/rows.length*100).toFixed(1)+'%' : '0%';
+
+  // ── ABA 1: CAPA / RESUMO EXECUTIVO ────────────────────────────────────
+  const capa = [
+    ['RELATÓRIO DE VALIDAÇÃO FINANCEIRO × RAZÃO CONTÁBIL'],
+    [],
+    ['Empresa:', 'MKB'],
+    ['Módulo:', modLbl],
+    ['Conta Contábil:', conta],
+    ['Período do Razão:', periodo],
+    ['Data de Geração:', dtGer],
+    [],
+    ['RESUMO EXECUTIVO'],
+    [],
+    ['Situação', 'Qtd. NFs', 'Vl. Razão', 'Vl. Financeiro', 'Diferença', '% do Total'],
+    ['✓ Conciliados',      concil.length,   concil.reduce((s,r)=>s+r.vlRaz,0),  concil.reduce((s,r)=>s+r.vlFin,0),  0,                              (rows.length?concil.length/rows.length*100:0).toFixed(1)+'%'],
+    ['⚠ Só no Razão',      soRazao.length,  soRazao.reduce((s,r)=>s+r.vlRaz,0), 0,                                   soRazao.reduce((s,r)=>s+r.diff,0),(rows.length?soRazao.length/rows.length*100:0).toFixed(1)+'%'],
+    ['⚠ Só no Financeiro', soFin.length,    0,                                   soFin.reduce((s,r)=>s+r.vlFin,0),   soFin.reduce((s,r)=>s+r.diff,0),  (rows.length?soFin.length/rows.length*100:0).toFixed(1)+'%'],
+    ['✗ Valor Divergente', diverg.length,   diverg.reduce((s,r)=>s+r.vlRaz,0),  diverg.reduce((s,r)=>s+r.vlFin,0),  diverg.reduce((s,r)=>s+r.diff,0), (rows.length?diverg.length/rows.length*100:0).toFixed(1)+'%'],
+    [],
+    ['TOTAL', rows.length, sumVlRaz, sumVlFin, sumDiff, '100%'],
+    [],
+    ['% Conciliação:', pctConcil],
+    ['Vl. Total Razão:', sumVlRaz],
+    ['Vl. Total Financeiro:', sumVlFin],
+    ['Vl. Total Divergências:', sumDiff],
+    [],
+    ['DETALHAMENTO DIVERGÊNCIAS'],
+    [],
+    ['Sub-tipo', 'Qtd.', 'Vl. Diferença'],
+    ['Retenções de imposto (~5%)', divRet.length,   divRet.reduce((s,r)=>s+r.diff,0)],
+    ['Outras divergências',        divOutro.length,  divOutro.reduce((s,r)=>s+r.diff,0)],
+  ];
+  const wsCapa = XLSX.utils.aoa_to_sheet(capa);
+  wsCapa['!cols'] = [{wch:30},{wch:20},{wch:18},{wch:18},{wch:15},{wch:12}];
+  // Merge título
+  wsCapa['!merges'] = [{s:{r:0,c:0},e:{r:0,c:5}}];
+  XLSX.utils.book_append_sheet(wb, wsCapa, 'Resumo Executivo');
+
+  // ── ABA 2: RESULTADO COMPLETO ─────────────────────────────────────────
+  const HDR = ['NF','Cliente / Fornecedor','Contas Contábeis','Emissão','Vencimento',
+               'Vl. Razão','Vl. Financeiro','Diferença','Dias Atraso','Status Fin.','Situação','Observação'];
+  const allRows = [HDR, ...rows.map(r=>[
+    r.nf, r.nome, r.contas||'—', r.dtEmissao, r.dtVencto,
+    r.vlRaz, r.vlFin, r.diff, r.dias, r.statusFin,
+    sitLabel[r.situacao]||r.situacao, r.obs||''
+  ])];
+  allRows.push([]);
+  allRows.push(['TOTAIS','','','','', sumVlRaz, sumVlFin, sumDiff,'','','','']);
+  const wsAll = XLSX.utils.aoa_to_sheet(allRows);
+  wsAll['!cols'] = [{wch:10},{wch:30},{wch:22},{wch:12},{wch:12},{wch:14},{wch:14},{wch:12},{wch:10},{wch:12},{wch:20},{wch:35}];
+  XLSX.utils.book_append_sheet(wb, wsAll, 'Resultado Completo');
+
+  // ── ABA 3: CONCILIADOS ────────────────────────────────────────────────
+  const wsConcil = XLSX.utils.aoa_to_sheet([HDR, ...concil.map(r=>[
+    r.nf, r.nome, r.contas||'—', r.dtEmissao, r.dtVencto,
+    r.vlRaz, r.vlFin, 0, r.dias, r.statusFin, '✓ Conciliado', r.obs||''
+  ]), [], ['TOTAL','','','','', concil.reduce((s,r)=>s+r.vlRaz,0), concil.reduce((s,r)=>s+r.vlFin,0),'','','','','']]);
+  wsConcil['!cols'] = wsAll['!cols'];
+  XLSX.utils.book_append_sheet(wb, wsConcil, 'Conciliados');
+
+  // ── ABA 4: SÓ NO RAZÃO ───────────────────────────────────────────────
+  const wsRaz = XLSX.utils.aoa_to_sheet([HDR, ...soRazao.map(r=>[
+    r.nf, r.nome, r.contas||'—', r.dtEmissao, r.dtVencto,
+    r.vlRaz, 0, r.diff, r.dias, r.statusFin, '⚠ Só no Razão', r.obs||''
+  ]), [], ['TOTAL','','','','', soRazao.reduce((s,r)=>s+r.vlRaz,0),'', soRazao.reduce((s,r)=>s+r.diff,0),'','','','']]);
+  wsRaz['!cols'] = wsAll['!cols'];
+  XLSX.utils.book_append_sheet(wb, wsRaz, 'Só no Razão');
+
+  // ── ABA 5: SÓ NO FINANCEIRO ───────────────────────────────────────────
+  const wsFin = XLSX.utils.aoa_to_sheet([HDR, ...soFin.map(r=>[
+    r.nf, r.nome, '—', r.dtEmissao, r.dtVencto,
+    0, r.vlFin, r.diff, r.dias, r.statusFin, '⚠ Só no Financeiro', r.obs||''
+  ]), [], ['TOTAL','','','','','', soFin.reduce((s,r)=>s+r.vlFin,0), soFin.reduce((s,r)=>s+r.diff,0),'','','','']]);
+  wsFin['!cols'] = wsAll['!cols'];
+  XLSX.utils.book_append_sheet(wb, wsFin, 'Só no Financeiro');
+
+  // ── ABA 6: DIVERGÊNCIAS DETALHADAS ───────────────────────────────────
+  const HDR_DIV = ['NF','Cliente / Fornecedor','Contas Contábeis','Emissão','Vencimento',
+                   'Vl. Razão','Vl. Financeiro','Diferença','% Dif.','Tipo Divergência','Observação'];
+  const wsDiverg = XLSX.utils.aoa_to_sheet([HDR_DIV, ...diverg.map(r=>{
+    const pct = r.vlRaz>0 ? (r.diff/r.vlRaz*100).toFixed(2)+'%' : '—';
+    const tipo = (r.obs||'').toLowerCase().includes('reten') ? 'Retenção de Imposto' : 'Divergência de Valor';
+    return [r.nf, r.nome, r.contas||'—', r.dtEmissao, r.dtVencto,
+            r.vlRaz, r.vlFin, r.diff, pct, tipo, r.obs||''];
+  }), [], ['TOTAL','','','','',
+    diverg.reduce((s,r)=>s+r.vlRaz,0),
+    diverg.reduce((s,r)=>s+r.vlFin,0),
+    diverg.reduce((s,r)=>s+r.diff,0),'','','']]);
+  wsDiverg['!cols'] = [{wch:10},{wch:30},{wch:22},{wch:12},{wch:12},{wch:14},{wch:14},{wch:12},{wch:8},{wch:22},{wch:35}];
+  XLSX.utils.book_append_sheet(wb, wsDiverg, 'Divergências');
+
+  // ── ABA 7: RETENÇÕES ─────────────────────────────────────────────────
+  const HDR_RET = ['NF','Cliente / Fornecedor','Contas Contábeis','Emissão','Vencimento',
+                   'Vl. Bruto (Razão)','Vl. Líquido (Fin.)','Vl. Retido','% Retenção','Observação'];
+  const wsRet = XLSX.utils.aoa_to_sheet([HDR_RET, ...divRet.map(r=>{
+    const pct = r.vlRaz>0 ? (r.diff/r.vlRaz*100).toFixed(2)+'%' : '—';
+    return [r.nf, r.nome, r.contas||'—', r.dtEmissao, r.dtVencto,
+            r.vlRaz, r.vlFin, r.diff, pct, r.obs||''];
+  }), [], ['TOTAL','','','','',
+    divRet.reduce((s,r)=>s+r.vlRaz,0),
+    divRet.reduce((s,r)=>s+r.vlFin,0),
+    divRet.reduce((s,r)=>s+r.diff,0),'','']]);
+  wsRet['!cols'] = [{wch:10},{wch:30},{wch:22},{wch:12},{wch:12},{wch:16},{wch:16},{wch:12},{wch:10},{wch:35}];
+  XLSX.utils.book_append_sheet(wb, wsRet, 'Retenções');
+
+  // ── Exportar ──────────────────────────────────────────────────────────
+  const fname = 'validacao_'+modulo+'_'+now.toISOString().split('T')[0]+'.xlsx';
+  XLSX.writeFile(wb, fname);
+}
+
+
+function popularSelectClientes() {
+  const modulo   = document.getElementById('vf-modulo').value;
+  const container = document.getElementById('vf-cliente-list');
+  if (!container) return;
+
+  // Guardar selecionados antes de rebuildar
+  const jaSelect = new Set(
+    [...container.querySelectorAll('input[type=checkbox]:checked')].map(cb=>cb.value)
+  );
+
+  const clientes = [...new Set(
+    (finData[modulo]||[]).map(f=>f.nome).filter(n=>n&&n.trim()&&n!=='—')
+  )].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+
+  if (!clientes.length) {
+    container.innerHTML='<div style="padding:8px;font-size:11px;color:var(--text3);">Nenhum cliente encontrado</div>';
+    return;
+  }
+
+  container.innerHTML = clientes.map(c => {
+    const chk = jaSelect.has(c) ? 'checked' : '';
+    const esc = c.replace(/"/g,'&quot;');
+    return `<label style="display:flex;align-items:center;gap:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--text);" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+      <input type="checkbox" value="${esc}" ${chk} onchange="renderValidFin()" style="cursor:pointer;">
+      <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px;" title="${esc}">${esc}</span>
+    </label>`;
+  }).join('');
+}
+
+function vfSelecionarTodos(sel) {
+  document.querySelectorAll('#vf-cliente-list input[type=checkbox]').forEach(cb=>{cb.checked=sel;});
+  renderValidFin();
+}
+
+function vfFiltrarCheckboxes() {
+  const q = (document.getElementById('vf-cliente-busca')?.value||'').toLowerCase();
+  document.querySelectorAll('#vf-cliente-list label').forEach(lbl=>{
+    const txt = lbl.querySelector('span')?.textContent||'';
+    lbl.style.display = txt.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+
+</script>
+</body>
+</html>
