@@ -9,7 +9,7 @@
 
 **Não é necessário instalar nada.** Acesse pelo navegador:
 
-👉 **[Abrir a ferramenta](https://mourafabio72.github.io/conciliacao-contabil/)**
+👉 **[Abrir a ferramenta](https://mourafabio72-tech.github.io/conciliacao-contabil/)**
 
 > Funciona em Chrome, Edge e Firefox. Os arquivos que você carrega **não saem do seu
 > computador** — todo o processamento é feito localmente no navegador.
