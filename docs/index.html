@@ -28,6 +28,20 @@ header .ver{font-size:11px;opacity:.6;letter-spacing:.04em;}
 .sys-btn.active{background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.6);font-weight:bold;}
 .sys-badge{font-size:10px;padding:2px 8px;border-radius:3px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.5);font-family:var(--mono);margin-left:8px;}
 
+/* ── EMPRESA (multiempresa) ──────────────────────────────────────────── */
+.empresa-bar{background:#143d2c;border-bottom:2px solid #07261a;padding:7px 2rem;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.empresa-bar label{font-size:11px;color:rgba(255,255,255,.6);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;}
+.empresa-bar select{width:auto;min-width:220px;max-width:340px;font-size:12px;padding:5px 8px;background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.25);}
+.empresa-bar select option{color:#1a1916;}
+.empresa-bar select:focus{border-color:rgba(255,255,255,.6);box-shadow:none;}
+#empresa-info{margin-left:auto;font-size:11px;color:rgba(255,255,255,.55);white-space:nowrap;}
+.empresa-display{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:bold;background:rgba(255,255,255,.12);border-radius:4px;padding:3px 10px;margin-left:12px;letter-spacing:.02em;}
+.empresa-display:empty{display:none;}
+
+.periodo-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-family:var(--mono);background:var(--accent-bg);color:var(--accent);border:1px solid #c8e6d4;border-radius:3px;padding:2px 6px 2px 8px;}
+.periodo-chip .rm{cursor:pointer;color:var(--danger);font-weight:bold;padding:0 2px;}
+.periodo-chip .rm:hover{text-decoration:underline;}
+
 .layout{display:flex;height:calc(100vh - 56px);overflow:hidden;}
 
 .sidebar{width:272px;min-width:272px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
@@ -213,9 +227,21 @@ td.cred{color:#8a1a1a;}
     <img src="data:image/gif;base64,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" alt="BPS4" style="height:36px;width:auto;display:block;">
     <div style="width:1px;height:28px;background:rgba(255,255,255,0.25);"></div>
     <h1>Conciliação Contábil</h1>
+    <span class="empresa-display" id="empresa-display"></span>
   </div>
   <span class="ver">Razão Analítico — MKB e Domínio · v3.0</span>
 </header>
+
+<div class="empresa-bar">
+  <label>Empresa:</label>
+  <select id="empresa-sel" onchange="onEmpresaChange()">
+    <option value="">— Selecione ou crie uma empresa —</option>
+  </select>
+  <button class="sys-btn" onclick="novaEmpresa()">+ Nova empresa</button>
+  <button class="sys-btn" id="renomear-empresa-btn" onclick="renomearEmpresa()" style="display:none">✎ Renomear</button>
+  <button class="sys-btn" id="excluir-empresa-btn" onclick="excluirEmpresa()" style="display:none">🗑 Excluir empresa</button>
+  <span id="empresa-info"></span>
+</div>
 
 <div class="sys-sel-bar">
   <label>Sistema contábil:</label>
@@ -236,6 +262,11 @@ td.cred{color:#8a1a1a;}
       </div>
       <input type="file" id="fi" accept=".xlsx,.xls">
       <div id="finfo" style="margin-top:7px;font-size:11px;color:var(--text3);"></div>
+    </div>
+
+    <div class="ss" id="periodos-panel" style="display:none">
+      <div class="slbl">Períodos carregados</div>
+      <div id="periodos-chips" style="display:flex;flex-wrap:wrap;gap:5px;"></div>
     </div>
 
     <div class="ss" id="fpanel" style="display:none">
@@ -281,8 +312,8 @@ td.cred{color:#8a1a1a;}
   <main class="main">
     <div id="est" class="empty">
       <span class="big">📊</span>
-      <h2>Nenhum arquivo carregado</h2>
-      <p>Carregue o razão analítico (.xlsx) para iniciar.</p>
+      <h2 id="est-title">Nenhuma empresa selecionada</h2>
+      <p id="est-msg">Selecione uma empresa existente ou clique em <strong>+ Nova empresa</strong> no topo, depois carregue o razão analítico (.xlsx).</p>
     </div>
     <div id="lst" class="loading" style="display:none">
       <p>Processando razão contábil...</p>
@@ -615,11 +646,12 @@ td.cred{color:#8a1a1a;}
 
 // ── SISTEMA CONTÁBIL ──────────────────────────────────────────────────────
 let _sistema = 'mkb'; // 'mkb' | 'dominio'
-function setSystem(s){
+// Atualiza botões/badge/hints sem confirmar nem apagar dados (usado ao trocar
+// de empresa, restaurando o sistema salvo dela)
+function setSystemSilent(s){
   _sistema = s;
   ['mkb','dominio'].forEach(x=>document.getElementById('btn-'+x).classList.toggle('active',x===s));
   document.getElementById('sys-badge').textContent = s==='mkb'?'Protheus ativo':'Domínio ativo';
-  // Atualizar hint e zona de upload
   var hint = document.getElementById('sys-hint');
   var uzp  = document.getElementById('uz-prompt');
   if(s==='dominio'){
@@ -631,19 +663,319 @@ function setSystem(s){
     if(hint) hint.style.color='rgba(255,255,255,.4)';
     if(uzp)  uzp.innerHTML = '<strong>Clique para carregar</strong><br>ou arraste o .xlsx aqui';
   }
-  // Resetar dados se já havia arquivo carregado
-  if(allData.length){
-    if(!confirm('Trocar o sistema irá limpar os dados atuais. Continuar?')){
-      setSystem(_sistema==='mkb'?'dominio':'mkb'); return;
-    }
-    allData=[];filtData=[];pares=[];
-    document.getElementById('app').style.display='none';
-    document.getElementById('est').style.display='block';
+}
+// Acionado pelos botões Protheus/Domínio. Não apaga dados — o sistema escolhido
+// vale para o PRÓXIMO arquivo carregado e é salvo na empresa atual.
+async function setSystem(s){
+  if(s===_sistema) return;
+  setSystemSilent(s);
+  if(_empresaAtual){
+    try{
+      const emp=await dbGetEmpresa(_empresaAtual) || {nome:_empresaAtual, saldosAbertura:{}, criadoEm:new Date().toISOString()};
+      emp.sistema=s; emp.atualizadoEm=new Date().toISOString();
+      await dbSaveEmpresa(emp);
+    }catch(err){ dbErr(err); }
   }
 }
 
 // ── STATE ─────────────────────────────────────────────────────────────────
 let allData=[], filtData=[], pares=[], statusF='all', sortSt={}, saldosAbertura={}, composicaoItens={}, finData={rec:[], pag:[]}; // composicaoItens: {conta_cod: [{nf,razao,valor,data}]}
+
+// ── EMPRESA ATIVA (multiempresa) ─────────────────────────────────────────
+let _empresaAtual = '';
+
+// ── COMPETÊNCIA (YYYY-MM) ─────────────────────────────────────────────────
+const MESES_ABREV=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+function competenciaDe(t){
+  const d=t.data;
+  return (d instanceof Date && !isNaN(d)) ? d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0') : null;
+}
+function fmtCompetencia(c){
+  const p=c.split('-'); return MESES_ABREV[parseInt(p[1],10)-1]+'/'+p[0];
+}
+
+// ── BANCO LOCAL (IndexedDB) — multiempresa + histórico mensal ────────────
+// empresas: {nome, sistema, saldosAbertura, criadoEm, atualizadoEm}
+// periodos: {id:'<empresa>|<YYYY-MM>', empresa, competencia, lancamentos, atualizadoEm}
+const DB_NAME='conciliacao_contabil_db', DB_VERSION=1;
+let _dbPromise=null;
+function dbOpen(){
+  if(_dbPromise) return _dbPromise;
+  _dbPromise=new Promise((resolve,reject)=>{
+    const req=indexedDB.open(DB_NAME,DB_VERSION);
+    req.onupgradeneeded=e=>{
+      const db=e.target.result;
+      if(!db.objectStoreNames.contains('empresas')) db.createObjectStore('empresas',{keyPath:'nome'});
+      if(!db.objectStoreNames.contains('periodos')){
+        const st=db.createObjectStore('periodos',{keyPath:'id'});
+        st.createIndex('empresa','empresa',{unique:false});
+      }
+    };
+    req.onsuccess=e=>resolve(e.target.result);
+    req.onerror=e=>reject(e.target.error);
+  });
+  return _dbPromise;
+}
+async function dbListEmpresas(){
+  const db=await dbOpen();
+  return new Promise((resolve,reject)=>{
+    const req=db.transaction('empresas','readonly').objectStore('empresas').getAll();
+    req.onsuccess=()=>resolve(req.result||[]);
+    req.onerror=e=>reject(e.target.error);
+  });
+}
+async function dbGetEmpresa(nome){
+  const db=await dbOpen();
+  return new Promise((resolve,reject)=>{
+    const req=db.transaction('empresas','readonly').objectStore('empresas').get(nome);
+    req.onsuccess=()=>resolve(req.result||null);
+    req.onerror=e=>reject(e.target.error);
+  });
+}
+async function dbSaveEmpresa(emp){
+  const db=await dbOpen();
+  return new Promise((resolve,reject)=>{
+    const req=db.transaction('empresas','readwrite').objectStore('empresas').put(emp);
+    req.onsuccess=()=>resolve();
+    req.onerror=e=>reject(e.target.error);
+  });
+}
+async function dbDeleteEmpresa(nome){
+  const db=await dbOpen();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(['empresas','periodos'],'readwrite');
+    tx.objectStore('empresas').delete(nome);
+    const cur=tx.objectStore('periodos').index('empresa').openCursor(IDBKeyRange.only(nome));
+    cur.onsuccess=e=>{const c=e.target.result; if(c){c.delete();c.continue();}};
+    tx.oncomplete=()=>resolve();
+    tx.onerror=e=>reject(e.target.error);
+  });
+}
+async function dbGetPeriodos(nomeEmpresa){
+  const db=await dbOpen();
+  return new Promise((resolve,reject)=>{
+    const req=db.transaction('periodos','readonly').objectStore('periodos').index('empresa').getAll(IDBKeyRange.only(nomeEmpresa));
+    req.onsuccess=()=>resolve(req.result||[]);
+    req.onerror=e=>reject(e.target.error);
+  });
+}
+async function dbSavePeriodo(nomeEmpresa,competencia,lancamentos){
+  const db=await dbOpen();
+  return new Promise((resolve,reject)=>{
+    const req=db.transaction('periodos','readwrite').objectStore('periodos').put({
+      id:nomeEmpresa+'|'+competencia, empresa:nomeEmpresa, competencia, lancamentos,
+      atualizadoEm:new Date().toISOString()
+    });
+    req.onsuccess=()=>resolve();
+    req.onerror=e=>reject(e.target.error);
+  });
+}
+async function dbDeletePeriodo(nomeEmpresa,competencia){
+  const db=await dbOpen();
+  return new Promise((resolve,reject)=>{
+    const req=db.transaction('periodos','readwrite').objectStore('periodos').delete(nomeEmpresa+'|'+competencia);
+    req.onsuccess=()=>resolve();
+    req.onerror=e=>reject(e.target.error);
+  });
+}
+function dbErr(err){
+  console.error('IndexedDB:',err);
+  alert('Erro ao acessar o banco local (IndexedDB) deste navegador:\n'+(err&&err.message?err.message:err)+
+    '\n\nVerifique se o navegador não está em modo de navegação anônima com armazenamento bloqueado.');
+}
+
+// ── GESTÃO DE EMPRESAS ────────────────────────────────────────────────────
+async function popularEmpresas(selecionar){
+  try{
+    const sel=document.getElementById('empresa-sel');
+    const empresas=await dbListEmpresas();
+    empresas.sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+    sel.innerHTML='<option value="">— Selecione ou crie uma empresa —</option>'
+      + empresas.map(e=>'<option value="'+e.nome.replace(/"/g,'&quot;')+'">'+e.nome+'</option>').join('');
+    sel.value=(selecionar && empresas.find(e=>e.nome===selecionar)) ? selecionar : '';
+    await onEmpresaChange();
+  }catch(err){ dbErr(err); }
+}
+
+async function novaEmpresa(){
+  const nome=prompt('Nome da nova empresa:');
+  if(nome===null) return;
+  const nomeT=nome.trim();
+  if(!nomeT){ alert('Informe um nome válido.'); return; }
+  try{
+    const existentes=await dbListEmpresas();
+    if(existentes.find(e=>e.nome.toLowerCase()===nomeT.toLowerCase())){
+      alert('Já existe uma empresa cadastrada com esse nome. Selecione-a na lista.');
+      return;
+    }
+    await dbSaveEmpresa({nome:nomeT, sistema:_sistema, saldosAbertura:{}, criadoEm:new Date().toISOString()});
+    await popularEmpresas(nomeT);
+  }catch(err){ dbErr(err); }
+}
+
+async function renomearEmpresa(){
+  if(!_empresaAtual) return;
+  const novo=prompt('Novo nome para "'+_empresaAtual+'":', _empresaAtual);
+  if(novo===null) return;
+  const novoT=novo.trim();
+  if(!novoT || novoT===_empresaAtual) return;
+  try{
+    const existentes=await dbListEmpresas();
+    if(existentes.find(e=>e.nome.toLowerCase()===novoT.toLowerCase())){
+      alert('Já existe uma empresa com esse nome.'); return;
+    }
+    const empAntiga=await dbGetEmpresa(_empresaAtual) || {sistema:_sistema, saldosAbertura:{}, criadoEm:new Date().toISOString()};
+    const periodos=await dbGetPeriodos(_empresaAtual);
+    await dbSaveEmpresa({...empAntiga, nome:novoT, atualizadoEm:new Date().toISOString()});
+    for(const p of periodos) await dbSavePeriodo(novoT,p.competencia,p.lancamentos);
+    await dbDeleteEmpresa(_empresaAtual);
+    await popularEmpresas(novoT);
+  }catch(err){ dbErr(err); }
+}
+
+async function excluirEmpresa(){
+  if(!_empresaAtual) return;
+  if(!confirm('Excluir a empresa "'+_empresaAtual+'" e TODOS os períodos salvos dela neste navegador?\n\nEsta ação não pode ser desfeita.')) return;
+  try{
+    await dbDeleteEmpresa(_empresaAtual);
+    localStorage.removeItem('cc_ultima_empresa');
+    await popularEmpresas('');
+  }catch(err){ dbErr(err); }
+}
+
+async function onEmpresaChange(){
+  _empresaAtual=document.getElementById('empresa-sel').value;
+  const mostrarBtns=!!_empresaAtual;
+  document.getElementById('renomear-empresa-btn').style.display=mostrarBtns?'':'none';
+  document.getElementById('excluir-empresa-btn').style.display=mostrarBtns?'':'none';
+  document.getElementById('empresa-display').textContent=_empresaAtual?'📂 '+_empresaAtual:'';
+
+  if(_empresaAtual) localStorage.setItem('cc_ultima_empresa',_empresaAtual);
+  else localStorage.removeItem('cc_ultima_empresa');
+
+  composicaoItens={}; finData={rec:[],pag:[]};
+
+  if(!_empresaAtual){
+    saldosAbertura={};
+    document.getElementById('empresa-info').textContent='';
+  } else {
+    try{
+      const emp=await dbGetEmpresa(_empresaAtual);
+      saldosAbertura=(emp && emp.saldosAbertura)?{...emp.saldosAbertura}:{};
+      setSystemSilent((emp && emp.sistema)||'mkb');
+    }catch(err){ dbErr(err); saldosAbertura={}; }
+  }
+  await carregarPeriodosEmpresa();
+}
+
+// ── PERÍODOS (histórico mensal por empresa) ──────────────────────────────
+function renderPeriodoChips(comps){
+  const panel=document.getElementById('periodos-panel');
+  const el=document.getElementById('periodos-chips');
+  if(!comps.length){ panel.style.display='none'; el.innerHTML=''; return; }
+  panel.style.display='block';
+  el.innerHTML=comps.map(c=>
+    '<span class="periodo-chip">'+fmtCompetencia(c)+
+    ' <span class="rm" onclick="removerPeriodo(\''+c+'\')" title="Remover este período">✕</span></span>'
+  ).join('');
+}
+function updEmpresaInfo(periodos){
+  const el=document.getElementById('empresa-info');
+  if(!periodos.length){ el.textContent=''; return; }
+  el.textContent=periodos.length+' período(s) salvo(s) · '+fmtCompetencia(periodos[0].competencia)+' a '+fmtCompetencia(periodos[periodos.length-1].competencia);
+}
+async function removerPeriodo(comp){
+  if(!confirm('Remover o período '+fmtCompetencia(comp)+' de "'+_empresaAtual+'"?\n\nOs lançamentos desse mês serão apagados do banco local deste navegador.')) return;
+  try{
+    await dbDeletePeriodo(_empresaAtual,comp);
+    await carregarPeriodosEmpresa();
+  }catch(err){ dbErr(err); }
+}
+async function carregarPeriodosEmpresa(){
+  if(!_empresaAtual){
+    renderPeriodoChips([]);
+    allData=[];filtData=[];pares=[];
+    document.getElementById('app').style.display='none';
+    document.getElementById('lst').style.display='none';
+    document.getElementById('est').style.display='block';
+    document.getElementById('est-title').textContent='Nenhuma empresa selecionada';
+    document.getElementById('est-msg').innerHTML='Selecione uma empresa existente ou clique em <strong>+ Nova empresa</strong> no topo, depois carregue o razão analítico (.xlsx).';
+    return;
+  }
+  let periodos=[];
+  try{ periodos=await dbGetPeriodos(_empresaAtual); }catch(err){ dbErr(err); }
+  periodos.sort((a,b)=>a.competencia.localeCompare(b.competencia));
+  renderPeriodoChips(periodos.map(p=>p.competencia));
+  updEmpresaInfo(periodos);
+
+  if(!periodos.length){
+    allData=[];filtData=[];pares=[];
+    document.getElementById('app').style.display='none';
+    document.getElementById('lst').style.display='none';
+    document.getElementById('est').style.display='block';
+    document.getElementById('est-title').textContent='Nenhum período carregado';
+    document.getElementById('est-msg').innerHTML='Carregue o razão analítico (.xlsx) de <strong>'+_empresaAtual+'</strong> para começar.';
+    return;
+  }
+
+  let tx=[];
+  periodos.forEach(p=>{ tx=tx.concat(p.lancamentos); });
+  document.getElementById('est').style.display='none';
+  document.getElementById('lst').style.display='block';
+  setP(80,'Recalculando conciliação acumulada — '+periodos.length+' período(s)...');
+  setTimeout(()=>classifyAll(tx),50);
+}
+
+// ── NOVO UPLOAD: agrupa por competência, detecta conflito com o já salvo,
+// mescla com o histórico acumulado da empresa ────────────────────────────
+async function handleNovoUpload(tx){
+  if(!_empresaAtual){
+    alert('Selecione uma empresa (ou clique em "+ Nova empresa") antes de carregar o razão.');
+    document.getElementById('lst').style.display='none';
+    document.getElementById('est').style.display='block';
+    return;
+  }
+
+  const grupos={};
+  let semData=0;
+  tx.forEach(t=>{
+    const comp=competenciaDe(t);
+    if(!comp){ semData++; return; }
+    (grupos[comp]=grupos[comp]||[]).push(t);
+  });
+  const novasComp=Object.keys(grupos).sort();
+  if(!novasComp.length){
+    alert('Não foi possível identificar o período (mês/ano) dos lançamentos deste arquivo.');
+    document.getElementById('lst').style.display='none';
+    document.getElementById('est').style.display='block';
+    return;
+  }
+
+  try{
+    const existentes=await dbGetPeriodos(_empresaAtual);
+    const existMap={}; existentes.forEach(p=>existMap[p.competencia]=true);
+    const conflitos=novasComp.filter(c=>existMap[c]);
+
+    let substituir=true;
+    if(conflitos.length){
+      const lbl=conflitos.map(fmtCompetencia).join(', ');
+      substituir=confirm(
+        'Os períodos '+lbl+' já estão salvos para "'+_empresaAtual+'".\n\n'+
+        'OK = substituir esses meses pelos dados deste arquivo.\n'+
+        'Cancelar = manter os dados já salvos e ignorar esses meses do arquivo novo.'
+      );
+    }
+
+    setP(85,'Salvando períodos em "'+_empresaAtual+'"...');
+    for(const comp of novasComp){
+      if(conflitos.includes(comp) && !substituir) continue;
+      await dbSavePeriodo(_empresaAtual,comp,grupos[comp]);
+    }
+    if(semData>0) console.warn(semData+' lançamento(s) sem data identificável não foram salvos.');
+
+    await carregarPeriodosEmpresa();
+  }catch(err){ dbErr(err); }
+}
 
 // ── UTILS ─────────────────────────────────────────────────────────────────
 const fBRL=v=>(isNaN(v)||v===null)?'—':new Intl.NumberFormat('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(v);
@@ -723,6 +1055,10 @@ uz.addEventListener('dragleave',()=>uz.classList.remove('drag'));
 uz.addEventListener('drop',e=>{e.preventDefault();uz.classList.remove('drag');if(e.dataTransfer.files[0])loadF(e.dataTransfer.files[0]);});
 
 function loadF(file){
+  if(!_empresaAtual){
+    alert('Selecione uma empresa (ou clique em "+ Nova empresa") antes de carregar o razão.');
+    return;
+  }
   document.getElementById('est').style.display='none';
   document.getElementById('lst').style.display='block';
   document.getElementById('app').style.display='none';
@@ -869,7 +1205,7 @@ function processWS_dominio(ws){
   }
 
   setP(65,'Conciliando...');
-  setTimeout(()=>classifyAll(tx),50);
+  setTimeout(()=>handleNovoUpload(tx),50);
 }
 
 
@@ -902,7 +1238,7 @@ function processWS(ws){
     }
   }
   setP(65,'Conciliando...');
-  setTimeout(()=>classifyAll(tx),50);
+  setTimeout(()=>handleNovoUpload(tx),50);
 }
 
 // ── CONTAS DE CONTROLE ────────────────────────────────────────────────────
@@ -985,6 +1321,7 @@ function classifyAll(tx){
   setP(90,'Renderizando...');
   setTimeout(()=>{
     allData=tx;filtData=[...allData];
+    reaplicarSaldosSalvos();
     buildUI();setP(100,'');
     document.getElementById('lst').style.display='none';
     const ap=document.getElementById('app');ap.style.display='flex';
@@ -1066,6 +1403,16 @@ function aplicarSaldo(){
   const val=parseFloat(document.getElementById('saldo-in').value);
   if(isNaN(val)||val<0){ alert('Informe um valor válido (pode ser 0,00).'); return; }
 
+  aplicarSaldoConta(conta, val);
+  persistSaldos();
+  renderBadges();
+  renderAll();
+}
+
+// Aplica/absorve o saldo de abertura de UMA conta em allData. Usada tanto pelo
+// botão "Aplicar" (aplicarSaldo) quanto para reaplicar saldos já salvos da
+// empresa após (re)carregar/acumular períodos (reaplicarSaldosSalvos).
+function aplicarSaldoConta(conta, val){
   // Resetar lançamentos anteriores desta conta antes de recalcular
   allData.forEach(t=>{if(t._was_ant&&t.conta_cod===conta){t.status=t._orig_st||'open';t._was_ant=false;t.match_status='';}});
 
@@ -1158,14 +1505,31 @@ function aplicarSaldo(){
         t.match_status += ' (parcial — período: '+fBRL(t.saldo_aberto)+')';
     });
   }
+}
 
-  renderBadges();
-  renderAll();
+// Reaplica todos os saldos de abertura já salvos da empresa atual sobre o
+// allData recém-carregado (ex.: após acumular novos períodos ou trocar empresa).
+function reaplicarSaldosSalvos(){
+  Object.entries(saldosAbertura).forEach(([conta,val])=>{
+    if(allData.some(t=>t.conta_cod===conta)) aplicarSaldoConta(conta, val);
+  });
+}
+
+// Grava saldosAbertura no registro da empresa atual (IndexedDB).
+function persistSaldos(){
+  if(!_empresaAtual) return;
+  dbGetEmpresa(_empresaAtual).then(emp=>{
+    emp = emp || {nome:_empresaAtual, sistema:_sistema, criadoEm:new Date().toISOString()};
+    emp.saldosAbertura={...saldosAbertura};
+    emp.atualizadoEm=new Date().toISOString();
+    return dbSaveEmpresa(emp);
+  }).catch(dbErr);
 }
 
 function remSaldo(conta){
   allData.forEach(t=>{if(t._was_ant&&t.conta_cod===conta){t.status=t._orig_st||'open';t._was_ant=false;t.match_status='';}});
   delete saldosAbertura[conta];
+  persistSaldos();
   const cur=getContaFiltrada();
   if(cur===conta){ document.getElementById('saldo-in').value=''; }
   renderBadges(); renderAll();
@@ -2618,6 +2982,16 @@ function vfFiltrarCheckboxes() {
   });
 }
 
+// ── INICIALIZAÇÃO ─────────────────────────────────────────────────────────
+// Abre o banco local, popula o seletor de empresas e restaura a última
+// empresa utilizada (localStorage), carregando seus períodos acumulados.
+(async function initApp(){
+  try{
+    await popularEmpresas(localStorage.getItem('cc_ultima_empresa')||'');
+  }catch(err){
+    dbErr(err);
+  }
+})();
 
 </script>
 </body>
