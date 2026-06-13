@@ -19,10 +19,15 @@
 ## 📋 Passo a passo
 
 1. Acesse o link acima
-2. Selecione o sistema do cliente (**Protheus** ou **Domínio**)
-3. Clique na área de upload e selecione o arquivo `.xlsx` do razão analítico
-4. Explore as abas: **Resumo · Conciliação · Em Aberto · Retenções · Divergências** etc.
-5. Exporte em **CSV** ou **Excel** quando precisar
+2. No topo, selecione a **empresa** (ou clique em **+ Nova empresa** para cadastrar)
+3. Selecione o sistema do cliente (**Protheus** ou **Domínio**)
+4. Clique na área de upload e selecione o arquivo `.xlsx` do razão analítico
+5. Explore as abas: **Resumo · Conciliação · Em Aberto · Retenções · Divergências** etc.
+6. Exporte em **CSV** ou **Excel** quando precisar
+
+> 💾 Os dados de cada empresa ficam salvos **no seu navegador** (veja a seção
+> [Multiempresa e histórico mensal](#-multiempresa-e-histórico-mensal) abaixo) — você
+> pode fechar a aba e voltar depois sem perder nada.
 
 ### Exportando o razão no Protheus (TOTVS)
 - Menu **Contabilidade Gerencial → Relatórios → Razão Analítico**
@@ -32,6 +37,43 @@
 - Menu **Relatórios → Razão Analítico**
 - Exportar como `.xlsx`
 - ⚠️ Arquivos `.xls` (formato antigo) precisam ser convertidos para `.xlsx` antes do upload
+
+---
+
+## 🏢 Multiempresa e histórico mensal
+
+A ferramenta guarda os dados **localmente no navegador** (IndexedDB) — nada é
+enviado para servidor. Isso permite trabalhar com várias empresas e acumular o
+razão **mês a mês**, sem precisar recarregar tudo de novo todo mês.
+
+### Empresas
+- **+ Nova empresa**: cadastra uma empresa pelo nome (sem CNPJ — apenas identificação).
+- **✎ Renomear** / **🗑 Excluir empresa**: gerencia o cadastro. Excluir remove
+  também todos os períodos salvos dessa empresa.
+- O sistema (Protheus/Domínio) e os saldos de abertura ficam salvos por empresa
+  e são restaurados automaticamente ao selecioná-la.
+
+### Períodos (carga mensal incremental)
+- Ao carregar um `.xlsx`, a ferramenta identifica a **competência (mês/ano)** de
+  cada lançamento pela data e salva os dados **agrupados por mês**.
+- Exemplo de uso real:
+  1. No primeiro acesso, carregue o razão de **jan–mai/2026** → a ferramenta separa
+     e salva 5 períodos (jan, fev, mar, abr, mai).
+  2. No mês seguinte, carregue **somente jun/2026** → a ferramenta soma esse mês
+     aos 5 já salvos, sem precisar re-carregar jan–mai.
+- A barra lateral mostra os **períodos carregados** (chips "jan/2026", "fev/2026"...).
+  Clique no ✕ de um chip para remover aquele mês específico.
+- **Conciliação acumulada**: o match NF × Recebimento é feito sobre **todo o
+  histórico salvo** da empresa — uma NF de maio paga em junho é casada corretamente
+  mesmo carregando os meses em arquivos separados.
+- **Conflito de período**: se você carregar um arquivo que contém um mês já salvo,
+  a ferramenta pergunta se deseja **substituir** os dados daquele mês ou **manter**
+  o que já estava salvo.
+
+### ⚠️ Sobre o armazenamento local
+- Os dados ficam no **IndexedDB do navegador**, associados a este site. Trocar de
+  navegador, computador, ou limpar dados de navegação **apaga o histórico salvo**.
+- Para trabalhos definitivos, continue exportando **CSV/Excel** pelas abas normalmente.
 
 ---
 
@@ -109,10 +151,13 @@ fixtures/                     ← dados de exemplo para testes
 
 - **Nenhum dado é enviado para servidores externos.** Todo o processamento acontece no navegador.
 - O único recurso externo carregado é a biblioteca [SheetJS](https://sheetjs.com/) (leitura de Excel), via CDN público.
-- Arquivos carregados existem apenas na memória do navegador durante o uso.
+- O histórico por empresa/período é salvo no **IndexedDB do navegador** (ver
+  [Multiempresa e histórico mensal](#-multiempresa-e-histórico-mensal)) — também
+  local, nunca enviado a servidor.
+- Arquivos carregados existem apenas na memória/armazenamento local do navegador.
 
 ---
 
 ## 📝 Versão
 
-**v6.0** — Protheus + Domínio · 9 abas de relatório · Exportação CSV/Excel
+**v6.1** — Protheus + Domínio · multiempresa + histórico mensal acumulado (IndexedDB) · 9 abas de relatório · Exportação CSV/Excel
