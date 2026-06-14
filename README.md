@@ -38,6 +38,11 @@
 - Exportar como `.xlsx`
 - ⚠️ Arquivos `.xls` (formato antigo) precisam ser convertidos para `.xlsx` antes do upload
 
+> 📖 **Novo na ferramenta?** Veja o [Manual do Usuário](MANUAL_USUARIO.md) — apresentação
+> completa em slides explicando regras de classificação, cruzamentos (NF × Recebimento e
+> Validação Financeiro), alertas/divergências, recursos (multiempresa, histórico mensal,
+> saldo de abertura) e as 9 abas de relatório.
+
 ---
 
 ## 🏢 Multiempresa e histórico mensal
