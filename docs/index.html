@@ -390,6 +390,7 @@ td.cred{color:#8a1a1a;}
         <button class="ptab" style="background:var(--accent);color:white;border-radius:4px 4px 0 0;font-weight:bold;" onclick="showP('resultado')">★ Resultado Final</button>
         <button class="ptab" style="background:#8a1a1a;color:white;border-radius:4px 4px 0 0;font-weight:bold;" onclick="showP('diverg')">⚠ Divergências</button>
         <button class="ptab" style="background:var(--info);color:white;border-radius:4px 4px 0 0;font-weight:bold;" onclick="showP('validfin')">🔗 Validação Financeiro</button>
+        <button class="ptab" style="background:#1a5276;color:white;border-radius:4px 4px 0 0;font-weight:bold;" onclick="showP('tribut')">📊 IRPJ/CSLL</button>
       </div>
 
       <!-- METRICS -->
@@ -638,6 +639,78 @@ td.cred{color:#8a1a1a;}
         </div>
       </div>
 
+      <!-- IRPJ / CSLL -->
+      <div class="ca" id="panel-tribut" style="display:none">
+
+        <!-- Upload -->
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:1rem;align-items:flex-start;">
+          <div style="flex:1;min-width:220px;">
+            <div style="font-size:11px;font-weight:bold;color:#1a5276;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">📊 Planilha ANUAL — Lucro Real (IRPJ / CSLL)</div>
+            <div class="vf-upload-zone" id="trib-upload-zone" onclick="document.getElementById('trib-fi').click()">
+              <div style="font-size:18px;margin-bottom:4px">📄</div>
+              <div style="font-size:12px;color:var(--text2)"><strong>Carregar planilha ANUAL</strong><br>.xlsx · aba "ANUAL"</div>
+            </div>
+            <input type="file" id="trib-fi" accept=".xlsx,.xls" style="display:none" onchange="loadTributario(this.files[0])">
+            <div id="trib-filename" style="font-size:11px;color:var(--accent);margin-top:4px;"></div>
+          </div>
+        </div>
+
+        <!-- Estado vazio -->
+        <div id="trib-empty" style="text-align:center;color:var(--text2);padding:40px 0;">
+          <div style="font-size:32px;margin-bottom:8px;">📊</div>
+          <div style="font-size:14px;font-weight:bold;">Nenhuma planilha carregada</div>
+          <div style="font-size:12px;margin-top:4px;">Carregue o arquivo <strong>.xlsx</strong> com a aba <strong>ANUAL</strong> para visualizar a apuração de IRPJ e CSLL.</div>
+        </div>
+
+        <!-- Conteúdo após upload -->
+        <div id="trib-content" style="display:none">
+
+          <!-- Seletor de meses -->
+          <div id="trib-mes-bar" class="ptabs" style="margin-bottom:12px;flex-wrap:wrap;"></div>
+
+          <!-- Cards de resumo -->
+          <div class="metrics" style="margin-bottom:1rem;">
+            <div class="metric" style="min-width:160px;">
+              <span class="mlbl">CSLL a Pagar</span>
+              <span class="mval danger" id="trib-card-csll">—</span>
+            </div>
+            <div class="metric" style="min-width:160px;">
+              <span class="mlbl">IRPJ a Pagar</span>
+              <span class="mval danger" id="trib-card-irpj">—</span>
+            </div>
+            <div class="metric" style="min-width:160px;">
+              <span class="mlbl">Base CSLL</span>
+              <span class="mval warn" id="trib-card-bcsll">—</span>
+            </div>
+            <div class="metric" style="min-width:160px;">
+              <span class="mlbl">Base IRPJ</span>
+              <span class="mval warn" id="trib-card-birpj">—</span>
+            </div>
+          </div>
+
+          <!-- Tabela de apuração -->
+          <div class="tw">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:130px;">Conta Contábil</th>
+                  <th>Descrição</th>
+                  <th style="text-align:right;width:170px;">Valor</th>
+                </tr>
+              </thead>
+              <tbody id="trib-tbody"></tbody>
+            </table>
+          </div>
+
+          <!-- Exports -->
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+            <button class="sbtn" onclick="expTributCSV()">⬇ Exportar CSV</button>
+            <button class="sbtn" style="background:var(--accent);" onclick="expTributXLSX()">⬇ Exportar XLSX</button>
+          </div>
+
+        </div>
+      </div>
+
     </div><!-- /app -->
   </main>
 </div>
@@ -680,6 +753,7 @@ async function setSystem(s){
 
 // ── STATE ─────────────────────────────────────────────────────────────────
 let allData=[], filtData=[], pares=[], statusF='all', sortSt={}, saldosAbertura={}, composicaoItens={}, finData={rec:[], pag:[]}; // composicaoItens: {conta_cod: [{nf,razao,valor,data}]}
+let tributData=[], tributMeses=[], tributMesAtivo=null; // módulo IRPJ/CSLL — Lucro Real anual
 
 // ── EMPRESA ATIVA (multiempresa) ─────────────────────────────────────────
 let _empresaAtual = '';
@@ -1966,7 +2040,7 @@ function renderContas(){
 
 // ── SHOW PANEL ────────────────────────────────────────────────────────────
 function showP(n){
-  const ps=['resumo','concil','abertos','ret','razao','contas','resultado','diverg','validfin'];
+  const ps=['resumo','concil','abertos','ret','razao','contas','resultado','diverg','validfin','tribut'];
   ps.forEach(p=>{const el=document.getElementById('panel-'+p);if(el)el.style.display=p===n?'':('none');});
   document.querySelectorAll('.ptab').forEach((t,i)=>t.classList.toggle('active',ps[i]===n));
 }
@@ -2980,6 +3054,206 @@ function vfFiltrarCheckboxes() {
     const txt = lbl.querySelector('span')?.textContent||'';
     lbl.style.display = txt.toLowerCase().includes(q) ? '' : 'none';
   });
+}
+
+// ── IRPJ / CSLL — LUCRO REAL ANUAL ───────────────────────────────────────
+
+// Converte célula da planilha para número (retorna null se vazio/inválido)
+function toNumT(v){
+  if(v===''||v===null||v===undefined) return null;
+  if(typeof v==='number') return isFinite(v)?v:null;
+  const s=String(v).replace(/\s/g,'').replace(/\./g,'').replace(',','.');
+  const n=parseFloat(s);
+  return isFinite(n)?n:null;
+}
+
+// Formata valor em R$ para exibição
+function fmtTribR(v){
+  if(v===null||v===undefined||!isFinite(v)) return '—';
+  const abs=Math.abs(v);
+  const fmt=abs.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  return (v<0?'(':'')+'R$ '+fmt+(v<0?')':'');
+}
+
+// Normaliza texto para comparação (sem acento, minúsculo)
+function normT(s){
+  s=String(s||'').toLowerCase().normalize('NFD');
+  let out='';
+  for(let i=0;i<s.length;i++){
+    const cc=s.codePointAt(i);
+    if(cc<0x0300||cc>0x036f) out+=s[i];
+  }
+  return out.trim();
+}
+
+// Parser da planilha ANUAL ────────────────────────────────────────────────
+// Recebe worksheet SheetJS; retorna {meses, itens}
+// itens: [{conta, label, valores:{mesLabel:num|null}, isHeader}]
+function parseTributario(ws){
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''});
+  if(!rows.length) return {meses:[],itens:[]};
+
+  const MESES_PT=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  const isMesCell=c=>{
+    const n=normT(c);
+    return MESES_PT.some(m=>n.startsWith(m)||n.includes(m+'/'));
+  };
+
+  // 1. Detectar linha de cabeçalho de meses (cols C+ com labels tipo "Jan/26")
+  let headerRowIdx=-1;
+  let colMeses={};
+  for(let r=0;r<Math.min(15,rows.length);r++){
+    const row=rows[r];
+    const map={};
+    for(let c=2;c<row.length;c++){
+      if(row[c]!==''&&isMesCell(String(row[c]))) map[c]=String(row[c]).trim();
+    }
+    if(Object.keys(map).length>=1){headerRowIdx=r;colMeses=map;break;}
+  }
+
+  // Fallback: sem linha de cabeçalho — gera labels Jan/26…Dez/26
+  if(headerRowIdx<0||!Object.keys(colMeses).length){
+    const LBL=['Jan/26','Fev/26','Mar/26','Abr/26','Mai/26','Jun/26','Jul/26','Ago/26','Set/26','Out/26','Nov/26','Dez/26'];
+    const maxC=rows.reduce((m,r)=>Math.max(m,r.length),0);
+    for(let c=2;c<Math.min(maxC,14);c++) colMeses[c]=LBL[c-2]||'M'+(c-1);
+    headerRowIdx=0;
+  }
+
+  const colIdx=Object.keys(colMeses).map(Number).sort((a,b)=>a-b);
+  const meses=colIdx.map(c=>colMeses[c]);
+
+  // 2. Processar linhas de dados (abaixo do cabeçalho)
+  const itens=[];
+  for(let r=headerRowIdx+1;r<rows.length;r++){
+    const row=rows[r];
+    const conta=String(row[0]||'').trim();
+    const label=String(row[1]||'').trim();
+    if(!label) continue;
+
+    const valores={};
+    colIdx.forEach((c,i)=>{ valores[meses[i]]=toNumT(row[c]); });
+
+    const hasValues=colIdx.some(c=>toNumT(row[c])!==null);
+    const isHeader=!hasValues;
+
+    itens.push({conta,label,valores,isHeader});
+  }
+
+  return {meses,itens};
+}
+
+// Upload da planilha ANUAL ────────────────────────────────────────────────
+async function loadTributario(file){
+  if(!file) return;
+  try{
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    const wsName=wb.SheetNames.find(n=>n.trim().toUpperCase()==='ANUAL')||wb.SheetNames[0];
+    const ws=wb.Sheets[wsName];
+    const result=parseTributario(ws);
+    tributData=result.itens;
+    tributMeses=result.meses;
+    tributMesAtivo=tributMeses[0]||null;
+    document.getElementById('trib-filename').textContent='📊 '+file.name+' · aba: '+wsName+' · '+tributMeses.length+' mês(es)';
+    renderTribut();
+  }catch(e){
+    alert('Erro ao ler a planilha:\n'+e.message);
+  }
+}
+
+// Busca item por palavras-chave no label (normalizado) ────────────────────
+function findTribItem(kws){
+  return tributData.find(it=>!it.isHeader&&kws.every(k=>normT(it.label).includes(normT(k))))||null;
+}
+
+// Render da aba IRPJ/CSLL ─────────────────────────────────────────────────
+function renderTribut(){
+  if(!document.getElementById('panel-tribut')) return;
+
+  if(!tributData.length||!tributMesAtivo){
+    document.getElementById('trib-content').style.display='none';
+    document.getElementById('trib-empty').style.display='';
+    return;
+  }
+  document.getElementById('trib-empty').style.display='none';
+  document.getElementById('trib-content').style.display='';
+
+  // Botões de mês
+  document.getElementById('trib-mes-bar').innerHTML=tributMeses.map(m=>
+    '<button class="ptab'+(m===tributMesAtivo?' active':'')+'" onclick="tributSetMes(\''+m+'\')">'+m+'</button>'
+  ).join('');
+
+  const mes=tributMesAtivo;
+
+  // Detectar linhas-chave para os cards de resumo
+  // Procura pela linha de CSLL final e IRPJ final
+  const csllFinal=findTribItem(['csll','final'])||findTribItem(['csll','a pagar'])||findTribItem(['final','csll'])||findTribItem(['valor','csll']);
+  const irpjFinal=findTribItem(['irpj','final'])||findTribItem(['irpj','a pagar'])||findTribItem(['final','irpj'])||findTribItem(['valor','irpj']);
+  const baseCsll =findTribItem(['base','csll'])||findTribItem(['calculo','csll']);
+  const baseIrpj =findTribItem(['base','irpj'])||findTribItem(['calculo','irpj']);
+
+  document.getElementById('trib-card-csll').textContent=csllFinal?fmtTribR(csllFinal.valores[mes]):'—';
+  document.getElementById('trib-card-irpj').textContent=irpjFinal?fmtTribR(irpjFinal.valores[mes]):'—';
+  document.getElementById('trib-card-bcsll').textContent=baseCsll?fmtTribR(baseCsll.valores[mes]):'—';
+  document.getElementById('trib-card-birpj').textContent=baseIrpj?fmtTribR(baseIrpj.valores[mes]):'—';
+
+  // Tabela principal
+  const isKeyRow=lbl=>/final|a pagar|valor\s*final|devid|valor\s*devido/i.test(lbl);
+  document.getElementById('trib-tbody').innerHTML=tributData.map(it=>{
+    const v=it.valores[mes];
+    const st=it.isHeader?'background:var(--bg2);font-weight:bold;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);':
+              isKeyRow(it.label)?'background:#e8f5e9;font-weight:bold;':'';
+    return '<tr style="'+st+'">'+
+      '<td style="font-size:11px;color:var(--text2);">'+(it.conta||'')+'</td>'+
+      '<td>'+(it.isHeader?'<strong>'+it.label+'</strong>':it.label)+'</td>'+
+      '<td style="text-align:right;">'+(v!==null?fmtTribR(v):'')+'</td>'+
+      '</tr>';
+  }).join('');
+}
+
+function tributSetMes(mes){
+  tributMesAtivo=mes;
+  renderTribut();
+}
+
+// Export IRPJ/CSLL ─────────────────────────────────────────────────────────
+function expTributCSV(){
+  if(!tributData.length) return;
+  const hdr=['Conta','Descrição',...tributMeses].join(';');
+  const linhas=tributData.map(it=>
+    [it.conta,it.label,...tributMeses.map(m=>{
+      const v=it.valores[m];
+      return v!==null?String(v).replace('.',','):'';
+    })].join(';')
+  );
+  const csv='﻿'+hdr+'\n'+linhas.join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download='irpj_csll_apuracao.csv';
+  a.click();
+}
+
+function expTributXLSX(){
+  if(!tributData.length) return;
+  const wb=XLSX.utils.book_new();
+  const wsData=[
+    ['Conta','Descrição',...tributMeses],
+    ...tributData.map(it=>[
+      it.conta,it.label,
+      ...tributMeses.map(m=>it.valores[m]!==null?it.valores[m]:'')
+    ])
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(wsData);
+  // Formata colunas de valores como moeda
+  const range=XLSX.utils.decode_range(ws['!ref']||'A1');
+  for(let c=2;c<=range.e.c;c++){
+    for(let r=1;r<=range.e.r;r++){
+      const cell=ws[XLSX.utils.encode_cell({r,c})];
+      if(cell&&typeof cell.v==='number') cell.z='R$ #,##0.00';
+    }
+  }
+  XLSX.utils.book_append_sheet(wb,ws,'IRPJ-CSLL');
+  XLSX.writeFile(wb,'irpj_csll_apuracao.xlsx');
 }
 
 // ── INICIALIZAÇÃO ─────────────────────────────────────────────────────────
