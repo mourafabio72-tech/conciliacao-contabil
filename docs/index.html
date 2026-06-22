@@ -88,8 +88,6 @@ header .ver{font-size:11px;opacity:.6;letter-spacing:.04em;}
 .upload-zone p{font-size:12px;color:var(--text2);}
 .upload-zone strong{color:var(--accent);}
 #file-input{display:none;}
-.fg{margin-bottom:.65rem;}
-.fg label{display:block;font-size:11px;color:var(--text2);margin-bottom:3px;}
 select,input[type=text],input[type=date],input[type=number]{width:100%;padding:5px 7px;border:1px solid var(--border2);border-radius:4px;background:var(--surface);color:var(--text);font-family:var(--font);font-size:12px;outline:none;}
 select:focus,input:focus{border-color:var(--accent2);box-shadow:0 0 0 2px rgba(45,138,90,.15);}
 .btn{display:block;width:100%;padding:7px 12px;background:var(--accent);color:white;border:none;border-radius:4px;font-family:var(--font);font-size:12px;letter-spacing:.05em;cursor:pointer;text-transform:uppercase;transition:background .15s;margin-top:5px;}
@@ -321,31 +319,6 @@ td.cred{color:var(--danger);}
     <div class="ss" id="periodos-panel" style="display:none">
       <div class="slbl">Períodos carregados</div>
       <div id="periodos-chips" style="display:flex;flex-wrap:wrap;gap:5px;"></div>
-    </div>
-
-    <div class="ss" id="fpanel" style="display:none">
-      <div class="slbl">Filtros Adicionais</div>
-      <div class="fg"><label>Tipo de conta</label>
-        <select id="f-tipo">
-          <option value="">Todas</option>
-          <option value="1.1.1">Caixa/Bancos (1.1.1)</option>
-          <option value="1.1.2">Aplicações (1.1.2)</option>
-          <option value="1.1.3">A Receber (1.1.3)</option>
-          <option value="1.1.4">Outros Ativos (1.1.4)</option>
-          <option value="1.2.1">Ativo NCirc. (1.2.1)</option>
-          <option value="2.1.2">Fornecedores (2.1.2)</option>
-          <option value="2.1.3">Obrig. Trab. (2.1.3)</option>
-          <option value="2.1.4">Obrig. Trib. (2.1.4)</option>
-          <option value="2.1.5">Outras c/ Pagar (2.1.5)</option>
-          <option value="2.2.1">Passivo LP (2.2.1)</option>
-        </select>
-      </div>
-      <div class="fg"><label>Conta específica</label><select id="f-conta"><option value="">Todas</option></select></div>
-      <div class="fg"><label>Filial</label><select id="f-filial"><option value="">Todas</option></select></div>
-      <div class="fg"><label>Período — início</label><input type="date" id="f-ini"></div>
-      <div class="fg"><label>Período — fim</label><input type="date" id="f-fim"></div>
-      <button class="btn" onclick="tfAplicar()">Aplicar filtros</button>
-      <button class="btn btn-o" onclick="tfLimpar()">Limpar</button>
     </div>
 
     <div class="ss" id="lpanel" style="display:none">
@@ -1516,7 +1489,6 @@ function classifyAll(tx){
     buildUI();setP(100,'');
     document.getElementById('lst').style.display='none';
     const ap=document.getElementById('app');ap.style.display='flex';
-    document.getElementById('fpanel').style.display='block';
     document.getElementById('lpanel').style.display='block';
   },50);
 }
@@ -1750,13 +1722,10 @@ function buildUI(){popFilts();setContaAtual('');renderAll();renderAccList();rend
 function renderAll(){updMetrics();renderResumo();renderConcil();renderAbertos();renderRet();renderRazao();renderContas();renderResultado();renderDiverg();renderAccList();}
 
 function popFilts(){
-  const contas=[...new Set(allData.map(t=>t.conta_cod).filter(Boolean))].sort();
   const filiais=[...new Set(allData.map(t=>t.filial).filter(Boolean))].sort();
   const dates=allData.map(t=>t.data).filter(Boolean).sort((a,b)=>a-b);
-  document.getElementById('f-conta').innerHTML='<option value="">Todas</option>'+contas.map(c=>{const t=allData.find(x=>x.conta_cod===c);return`<option value="${c}">${c} — ${t?t.conta_desc:''}</option>`;}).join('');
-  const optF='<option value="">Todas</option>'+filiais.map(f=>`<option value="${f}">${f}</option>`).join('');
-  document.getElementById('tf-filial').innerHTML=document.getElementById('f-filial').innerHTML=optF;
-  if(dates.length){const ini=dates[0].toISOString().split('T')[0],fim=dates[dates.length-1].toISOString().split('T')[0];['tf-ini','f-ini'].forEach(id=>document.getElementById(id).value=ini);['tf-fim','f-fim'].forEach(id=>document.getElementById(id).value=fim);}
+  document.getElementById('tf-filial').innerHTML='<option value="">Todas</option>'+filiais.map(f=>`<option value="${f}">${f}</option>`).join('');
+  if(dates.length){const ini=dates[0].toISOString().split('T')[0],fim=dates[dates.length-1].toISOString().split('T')[0];document.getElementById('tf-ini').value=ini;document.getElementById('tf-fim').value=fim;}
   popularTiposConta();
   // Novo conjunto de dados → volta para "todas as contas" no filtro multi-seleção.
   _contasFiltro=null;
@@ -1902,10 +1871,6 @@ function tfAplicar(){
     if(filial&&t.filial!==filial)return false;
     return true;
   });
-  document.getElementById('f-tipo').value=tipo;
-  document.getElementById('f-filial').value=filial;
-  document.getElementById('f-ini').value=ini;
-  document.getElementById('f-fim').value=fim;
   // Saldo de abertura / saldo corrente só fazem sentido com EXATAMENTE 1 conta
   // marcada — com 0, 2+ ou "todas", ficam desabilitados (igual a antes).
   setContaAtual(getContaSelecionadaUnica());
@@ -1996,7 +1961,7 @@ function renderAccList(){
   sorted.slice(0,120).forEach(c=>{
     const div=document.createElement('div');div.className='acc-item';
     div.innerHTML=`<span class="acc-code">${c.cod}</span><span class="acc-name">${c.desc}</span>${c.open>0?`<span class="acc-bdg bdg-open">${c.open} aberto(s)</span>`:'<span class="acc-bdg bdg-ok">ok</span>'}`;
-    div.onclick=()=>{document.querySelectorAll('.acc-item').forEach(i=>i.classList.remove('active'));div.classList.add('active');contaSelecionarUnica(c.cod);document.getElementById('f-conta').value=c.cod;tfAplicar();};
+    div.onclick=()=>{document.querySelectorAll('.acc-item').forEach(i=>i.classList.remove('active'));div.classList.add('active');contaSelecionarUnica(c.cod);tfAplicar();};
     list.appendChild(div);
   });
 }
