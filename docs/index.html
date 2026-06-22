@@ -1332,11 +1332,14 @@ function isOA(cod){
   if(OPFX.some(p=>cod.startsWith(p))) return true;
   // Contas de resultado (3..9) nunca são open-account.
   if(/^[3-9]/.test(cod)) return false;
-  // Caixa/Banco pelo prefixo clássico 1.1.1 (fallback se descrição vier vazia).
-  if(/^1\.1\.1(?:\.|$)/.test(cod)) return false;
-  // Caixa/Banco pela descrição (cobre planos com numeração diferente).
+  // Caixa/Banco pela descrição (cobre planos com numeração diferente) — tem
+  // prioridade sobre o prefixo, pois algumas empresas usam "1.1.1.xx" para
+  // contas que NÃO são caixa/banco (ex.: 1.1.1.20.10025 — ISS a recuperar).
   const d = _descByCod[cod] || '';
   if(NON_OA_DESC.test(d)) return false;
+  // Caixa/Banco pelo prefixo clássico 1.1.1 — só como fallback quando não há
+  // descrição disponível para confirmar.
+  if(!d && /^1\.1\.1(?:\.|$)/.test(cod)) return false;
   // Default: Ativo/Passivo Circulante e Não-Circulante (1.1.*, 1.2.*, 2.1.*, 2.2.*).
   if(/^[12]\.[12]\./.test(cod)) return true;
   return false;
