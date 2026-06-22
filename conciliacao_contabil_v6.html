@@ -371,12 +371,14 @@ td.cred{color:#8a1a1a;}
         <input type="number" id="saldo-in" step="0.01" placeholder="Ex: 886015.17" disabled style="opacity:.5">
         <button class="sbtn" id="saldo-btn" onclick="aplicarSaldo()" disabled style="opacity:.5">Aplicar</button>
         <div style="width:1px;height:24px;background:var(--border2);margin:0 4px;"></div>
+        <button class="sbtn" id="saldo-lote-btn" onclick="abrirSaldosLote()" style="background:var(--accent);font-weight:bold;">📋 Saldos em lote</button>
+        <div style="width:1px;height:24px;background:var(--border2);margin:0 4px;"></div>
         <button class="sbtn" id="comp-btn" onclick="document.getElementById('comp-fi').click()" disabled style="opacity:.5;background:#6b3fa0;">📎 Composição</button>
         <input type="file" id="comp-fi" accept=".xlsx,.xls,.csv" style="display:none" onchange="loadComposicao(this)">
         <div id="comp-lbl" style="font-size:11px;color:var(--ret);display:none;"></div>
         <button class="sbtn" id="comp-clear-btn" onclick="clearComposicao()" style="display:none;background:#999;font-size:10px;padding:0 8px;">✕ Composição</button>
         <div id="saldo-bdg" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
-        <span id="saldo-hint" class="saldo-hint">ℹ️ Selecione uma conta contábil no filtro acima para habilitar este campo</span>
+        <span id="saldo-hint" class="saldo-hint">ℹ️ Conta única: selecione uma conta acima. Para informar <strong>todas de uma vez</strong>, use <strong>📋 Saldos em lote</strong>.</span>
       </div>
 
       <!-- TABS -->
@@ -1316,11 +1318,35 @@ function processWS(ws){
 }
 
 // ── CONTAS DE CONTROLE ────────────────────────────────────────────────────
+// Lista whitelist clássica (planos de 3 níveis tipo Protheus).
 const OPFX=['1.1.2','1.1.3','1.1.4','1.1.5','1.2.1','1.2.3','1.2.5','2.1.2','2.1.3','2.1.4','2.1.5','2.1.6','2.2.1','2.2.2','2.2.4','2.2.6'];
-const isOA=cod=>cod&&OPFX.some(p=>cod.startsWith(p));
+// Descrição → não conciliável (caixa, banco, aplicação financeira, disponibilidades).
+// Reconcilia-se contra extrato bancário, não contra NF.
+const NON_OA_DESC = /\b(caixa|banco|bancos|tesouraria|aplica[çc][aã]o\s+financeira|aplica[çc][oõ]es?\s+financeiras?|cdb|fundo\s+de\s+investimento|disponibilidad)/i;
+// Cache descrição → código (preenchido em classifyAll, antes do isOA rodar).
+let _descByCod = {};
+
+function isOA(cod){
+  if(!cod) return false;
+  // Whitelist clássica primeiro (retrocompatibilidade).
+  if(OPFX.some(p=>cod.startsWith(p))) return true;
+  // Contas de resultado (3..9) nunca são open-account.
+  if(/^[3-9]/.test(cod)) return false;
+  // Caixa/Banco pelo prefixo clássico 1.1.1 (fallback se descrição vier vazia).
+  if(/^1\.1\.1(?:\.|$)/.test(cod)) return false;
+  // Caixa/Banco pela descrição (cobre planos com numeração diferente).
+  const d = _descByCod[cod] || '';
+  if(NON_OA_DESC.test(d)) return false;
+  // Default: Ativo/Passivo Circulante e Não-Circulante (1.1.*, 1.2.*, 2.1.*, 2.2.*).
+  if(/^[12]\.[12]\./.test(cod)) return true;
+  return false;
+}
 
 // ── CLASSIFICAÇÃO ─────────────────────────────────────────────────────────
 function classifyAll(tx){
+  // Cache descrição por código antes de chamar isOA (a heurística usa descrição).
+  _descByCod = {};
+  tx.forEach(t=>{ if(t.conta_cod && !_descByCod[t.conta_cod]) _descByCod[t.conta_cod] = t.conta_desc || ''; });
   tx.forEach(t=>{t.is_open_account=isOA(t.conta_cod);if(!t.is_open_account)t.status='na';});
   const cmap={};
   tx.filter(t=>t.is_open_account).forEach(t=>{if(!cmap[t.conta_cod])cmap[t.conta_cod]=[];cmap[t.conta_cod].push(t);});
@@ -1430,7 +1456,7 @@ function syncSaldoBar(){
     const cb2=document.getElementById('comp-btn');
     if(cb2){cb2.disabled=true;cb2.style.opacity='.4';}
     const h=document.getElementById('saldo-hint');
-    if(h) h.textContent='ℹ️ Selecione uma conta contábil no filtro acima para habilitar este campo';
+    if(h) h.textContent='ℹ️ Conta única: selecione uma conta. Para todas de uma vez, use 📋 Saldos em lote.';
   } else {
     const t=allData.find(x=>x.conta_cod===conta);
     lbl.textContent=(conta+(t?' — '+t.conta_desc:''));
@@ -3267,6 +3293,269 @@ function expTributXLSX(){
   }
 })();
 
+// ════════════════════════════════════════════════════════════════════════
+// SALDOS DE ABERTURA EM LOTE  (grade editável + importar balancete + zerar)
+// ════════════════════════════════════════════════════════════════════════
+let _loteVals = {};     // {conta_cod: stringDigitada}
+let _loteImport = null; // {headers:[], rows:[[]]}
+
+function loteNorm(s){ return String(s==null?'':s).replace(/\D/g,''); }
+
+// Aceita "1.234,56", "1234,56", "1234.56", "1234", "(1.234,56)", "R$ 1.234,56"
+function parseSaldoNum(s){
+  if(typeof s === 'number') return s;
+  s = String(s==null?'':s).trim().replace(/\s/g,'').replace(/r\$/i,'');
+  if(s==='') return NaN;
+  let neg=false;
+  if(/^\(.*\)$/.test(s)){ neg=true; s=s.slice(1,-1); }
+  if(s.startsWith('-')){ neg=true; s=s.slice(1); }
+  if(s.includes(',')){
+    s = s.replace(/\./g,'').replace(',','.');     // BR: ponto=milhar, vírgula=decimal
+  } else if(/^\d{1,3}(\.\d{3})+$/.test(s)){
+    s = s.replace(/\./g,'');                       // só pontos de milhar (ex.: 1.234 / 886.015)
+  }                                                // senão: ponto é decimal (ex.: 886015.17)
+  const v = parseFloat(s);
+  if(isNaN(v)) return NaN;
+  return neg ? -v : v;
+}
+
+function abrirSaldosLote(){
+  if(!allData.length){ alert('Carregue o razão analítico primeiro.'); return; }
+  _loteImport = null;
+  _loteVals = {};
+  Object.entries(saldosAbertura).forEach(([c,v])=>{ _loteVals[c] = String(v); });
+  const mp = document.getElementById('lote-map'); if(mp) mp.style.display='none';
+  const bs = document.getElementById('lote-busca'); if(bs) bs.value='';
+  loteRenderGrid();
+  document.getElementById('lote-overlay').style.display='flex';
+}
+function fecharSaldosLote(){ document.getElementById('lote-overlay').style.display='none'; }
+
+function loteContas(){ return [...new Set(allData.map(t=>t.conta_cod).filter(Boolean))].sort(); }
+
+function loteRenderGrid(){
+  const q = (document.getElementById('lote-busca').value||'').toLowerCase();
+  const meta = {};
+  allData.forEach(t=>{ if(t.conta_cod && !meta[t.conta_cod]) meta[t.conta_cod] = t.conta_desc||''; });
+  const contas = loteContas();
+  let shown = 0;
+  const html = contas.filter(c=>{
+    const d=(meta[c]||'').toLowerCase();
+    return !q || c.toLowerCase().includes(q) || d.includes(q);
+  }).map(c=>{
+    shown++;
+    const passivo = getNatureza(c)==='passivo';
+    const val = _loteVals[c]!==undefined ? _loteVals[c] : '';
+    return `<tr>
+      <td class="lc">${c}</td>
+      <td class="ld">${meta[c]||''}</td>
+      <td><span class="lnat ${passivo?'np':'na2'}">${passivo?'Passivo':'Ativo'}</span></td>
+      <td style="text-align:right"><input type="text" class="lote-inp" data-conta="${c}" value="${String(val).replace(/"/g,'&quot;')}" placeholder="—" oninput="_loteVals[this.dataset.conta]=this.value"></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('lote-tb').innerHTML = html || '<tr><td colspan="4" style="text-align:center;color:var(--text3);padding:22px">Nenhuma conta encontrada.</td></tr>';
+  document.getElementById('lote-count').textContent = shown + ' de ' + contas.length + ' contas';
+}
+
+function loteSyncVisible(){
+  document.querySelectorAll('#lote-tb .lote-inp').forEach(i=>{ _loteVals[i.dataset.conta] = i.value; });
+}
+
+function loteZerarTodos(){
+  loteContas().forEach(c=> _loteVals[c]='0');
+  loteRenderGrid();
+}
+function loteLimparTodos(){ _loteVals = {}; loteRenderGrid(); }
+
+// ── Importação de balancete (xlsx/csv) com detecção de colunas ──────────────
+function loteImportBalancete(input){
+  const file = input.files[0]; if(!file) return;
+  const isCsv = /\.csv$/i.test(file.name);
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      let headers=[], rows=[];
+      if(isCsv){
+        const lines = String(e.target.result).split(/\r?\n/).filter(l=>l.trim());
+        if(!lines.length){ alert('Arquivo vazio.'); return; }
+        const sep = lines[0].includes(';') ? ';' : ',';
+        const split = l => l.split(sep).map(c=>c.replace(/^"|"$/g,'').trim());
+        headers = split(lines[0]);
+        rows = lines.slice(1).map(split);
+      } else {
+        const wb = XLSX.read(e.target.result, {type:'array', cellDates:false});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+        if(!aoa.length){ alert('Planilha vazia.'); return; }
+        // Localizar a linha de cabeçalho (1ª linha com >=2 células e algum texto)
+        let hi = 0;
+        for(let i=0;i<Math.min(aoa.length,20);i++){
+          const ne = aoa[i].filter(c=>String(c).trim()!=='').length;
+          const txt = aoa[i].some(c=>/[A-Za-zÀ-ÿ]/.test(String(c)));
+          if(ne>=2 && txt){ hi=i; break; }
+        }
+        headers = aoa[hi].map(c=>String(c).trim());
+        rows = aoa.slice(hi+1);
+      }
+      _loteImport = { headers, rows };
+      loteBuildMapUI(loteGuessAccCol(headers,rows), loteGuessValCol(headers));
+      loteRemap();
+    }catch(err){ alert('Falha ao ler o arquivo: '+err.message); }
+  };
+  if(isCsv) reader.readAsText(file,'utf-8'); else reader.readAsArrayBuffer(file);
+  input.value='';
+}
+
+function loteGuessAccCol(headers, rows){
+  const known = new Set(allData.map(t=>t.conta_cod));
+  const knownNorm = {}; allData.forEach(t=>{ if(t.conta_cod) knownNorm[loteNorm(t.conta_cod)]=1; });
+  const sample = rows.slice(0,300);
+  let best=-1, bestScore=-1;
+  for(let c=0;c<headers.length;c++){
+    let s=0;
+    sample.forEach(r=>{ const v=String(r[c]==null?'':r[c]).trim(); if(!v) return; if(known.has(v)||knownNorm[loteNorm(v)]) s++; });
+    if(s>bestScore){ bestScore=s; best=c; }
+  }
+  if(bestScore>0) return best;
+  const h = headers.map(x=>String(x).toLowerCase());
+  const byName = h.findIndex(x=>x.includes('conta')||x.includes('cód')||x.includes('cod')||x.includes('cta')||x.includes('reduz'));
+  return byName>=0 ? byName : 0;
+}
+function loteGuessValCol(headers){
+  const h = headers.map(x=>String(x).toLowerCase());
+  const pri = ['abertura','saldo final','saldo atual','final','atual','saldo anterior','anterior','saldo','valor'];
+  for(const p of pri){ const i=h.findIndex(x=>x.includes(p)); if(i>=0) return i; }
+  return headers.length-1;
+}
+
+function loteBuildMapUI(accCol, valCol){
+  const opts = sel => _loteImport.headers.map((h,i)=>`<option value="${i}" ${i===sel?'selected':''}>${(h||('Coluna '+(i+1)))}</option>`).join('');
+  const m = document.getElementById('lote-map');
+  m.innerHTML = `<div class="lmrow">
+    <label>Coluna da <strong>conta</strong>:</label>
+    <select id="lote-acccol" onchange="loteRemap()">${opts(accCol)}</select>
+    <label>Coluna do <strong>saldo 31/12</strong>:</label>
+    <select id="lote-valcol" onchange="loteRemap()">${opts(valCol)}</select>
+    <span id="lote-matchinfo" class="lmatch"></span>
+  </div>`;
+  m.style.display='block';
+}
+
+function loteRemap(){
+  if(!_loteImport) return;
+  const accCol = +document.getElementById('lote-acccol').value;
+  const valCol = +document.getElementById('lote-valcol').value;
+  const known = new Set(allData.map(t=>t.conta_cod));
+  const norm = {}; allData.forEach(t=>{ if(t.conta_cod) norm[loteNorm(t.conta_cod)] = t.conta_cod; });
+  let matched = 0;
+  _loteImport.rows.forEach(r=>{
+    const raw = String(r[accCol]==null?'':r[accCol]).trim();
+    if(!raw) return;
+    const conta = known.has(raw) ? raw : norm[loteNorm(raw)];
+    if(!conta) return;
+    const v = r[valCol];
+    if(v===''||v==null) return;
+    _loteVals[conta] = String(v).trim();
+    matched++;
+  });
+  const info = document.getElementById('lote-matchinfo');
+  if(info) info.textContent = matched + ' conta(s) casada(s) com o app';
+  loteRenderGrid();
+}
+
+function loteAplicar(){
+  loteSyncVisible();
+  const desired = {};
+  Object.entries(_loteVals).forEach(([conta, raw])=>{
+    const s = String(raw).trim();
+    if(s==='') return;                 // em branco = não informar
+    const v = parseSaldoNum(s);
+    if(!isNaN(v)) desired[conta] = Math.abs(v);   // magnitude; natureza vem do código
+  });
+  // Remover saldos que foram apagados (estavam salvos, agora em branco)
+  Object.keys(saldosAbertura).forEach(conta=>{
+    if(!(conta in desired)){
+      allData.forEach(t=>{ if(t._was_ant && t.conta_cod===conta){ t.status=t._orig_st||'open'; t._was_ant=false; t.match_status=''; } });
+      delete saldosAbertura[conta];
+    }
+  });
+  // Aplicar/atualizar (aplicarSaldoConta já reseta as marcas anteriores da própria conta)
+  Object.entries(desired).forEach(([conta, val])=> aplicarSaldoConta(conta, val));
+  persistSaldos();
+  fecharSaldosLote();
+  // Mudar o filtro para "Todas as contas" e renderizar tudo conciliado
+  const sel = document.getElementById('tf-conta'); if(sel) sel.value='';
+  syncSaldoBar(); renderBadges();
+  if(typeof tfAplicar==='function') tfAplicar(); else renderAll();
+  const n = Object.keys(desired).length;
+  alert('✓ Saldos de abertura aplicados em ' + n + ' conta(s).\nFiltro ajustado para "Todas as contas" — a análise consolidada já está na tela.');
+}
+
 </script>
+
+<style id="lote-css">
+.lote-overlay{position:fixed;inset:0;background:rgba(26,25,22,.55);z-index:9999;display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;}
+.lote-modal{background:var(--surface);width:100%;max-width:760px;border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,.3);display:flex;flex-direction:column;max-height:88vh;font-family:var(--font);}
+.lote-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);background:#fffbf0;border-radius:8px 8px 0 0;}
+.lote-head h3{margin:0;font-size:15px;color:var(--warn);}
+.lote-head h3 span{font-size:11px;color:var(--text3);font-weight:normal;}
+.lote-x{border:none;background:none;font-size:18px;cursor:pointer;color:var(--text3);}
+.lote-x:hover{color:var(--danger);}
+.lote-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--border);}
+.lote-busca{flex:1;min-width:160px;height:30px;padding:0 10px;border:1px solid var(--border2);border-radius:4px;font-size:12px;font-family:var(--font);}
+.lote-count{font-size:11px;color:var(--text3);white-space:nowrap;}
+.ltbtn{height:30px;padding:0 12px;border:none;border-radius:4px;font-size:12px;font-family:var(--font);cursor:pointer;color:#fff;}
+.ltbtn.imp{background:var(--info);}.ltbtn.zer{background:var(--warn);}.ltbtn.lim{background:#999;}
+.ltbtn.apply{background:var(--accent);font-weight:bold;}.ltbtn.cancel{background:#888;}
+.ltbtn:hover{filter:brightness(1.1);}
+.lote-map{padding:10px 18px;background:var(--surface2);border-bottom:1px solid var(--border);}
+.lmrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12px;color:var(--text2);}
+.lmrow select{height:28px;border:1px solid var(--border2);border-radius:4px;font-size:12px;max-width:220px;}
+.lmatch{color:var(--accent);font-weight:bold;}
+.lote-gridwrap{overflow:auto;flex:1;}
+.lote-grid{width:100%;border-collapse:collapse;font-size:12px;}
+.lote-grid th{position:sticky;top:0;background:var(--surface2);text-align:left;padding:7px 10px;border-bottom:1px solid var(--border2);color:var(--text2);font-size:11px;text-transform:uppercase;letter-spacing:.04em;}
+.lote-grid td{padding:5px 10px;border-bottom:1px solid var(--border);}
+.lote-grid td.lc{font-family:var(--mono);font-weight:bold;color:var(--text);white-space:nowrap;}
+.lote-grid td.ld{color:var(--text2);}
+.lnat{font-size:10px;padding:1px 7px;border-radius:10px;font-weight:bold;}
+.lnat.np{background:#e8eeff;color:var(--info);}
+.lnat.na2{background:#e6f3ec;color:var(--accent);}
+.lote-inp{width:130px;height:28px;padding:0 8px;border:1px solid #c8a800;border-radius:4px;font-family:var(--mono);font-size:12px;text-align:right;}
+.lote-inp:focus{outline:2px solid var(--accent2);}
+.lote-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px;border-top:1px solid var(--border);background:var(--surface2);border-radius:0 0 8px 8px;flex-wrap:wrap;}
+.lote-hint{font-size:10.5px;color:var(--text3);max-width:380px;line-height:1.4;}
+</style>
+
+<div id="lote-overlay" class="lote-overlay" onclick="if(event.target===this)fecharSaldosLote()">
+  <div class="lote-modal">
+    <div class="lote-head">
+      <h3>📋 Saldos de Abertura em lote <span>(31/12/2025)</span></h3>
+      <button class="lote-x" onclick="fecharSaldosLote()">✕</button>
+    </div>
+    <div class="lote-tools">
+      <button class="ltbtn imp" onclick="document.getElementById('lote-fi').click()">⬆ Importar balancete</button>
+      <input type="file" id="lote-fi" accept=".xlsx,.xls,.csv" style="display:none" onchange="loteImportBalancete(this)">
+      <button class="ltbtn zer" onclick="loteZerarTodos()">Zerar todos (0,00)</button>
+      <button class="ltbtn lim" onclick="loteLimparTodos()">Limpar</button>
+      <input type="text" id="lote-busca" class="lote-busca" placeholder="🔎 filtrar conta ou descrição" oninput="loteRenderGrid()">
+      <span class="lote-count" id="lote-count"></span>
+    </div>
+    <div id="lote-map" class="lote-map" style="display:none"></div>
+    <div class="lote-gridwrap">
+      <table class="lote-grid">
+        <thead><tr><th>Conta</th><th>Descrição</th><th>Natureza</th><th style="text-align:right">Saldo 31/12/2025</th></tr></thead>
+        <tbody id="lote-tb"></tbody>
+      </table>
+    </div>
+    <div class="lote-foot">
+      <span class="lote-hint">Em branco = não informado · 0,00 = sem saldo de abertura · informe o valor positivo (a natureza Ativo/Passivo é definida pelo código da conta).</span>
+      <div style="display:flex;gap:8px;">
+        <button class="ltbtn cancel" onclick="fecharSaldosLote()">Cancelar</button>
+        <button class="ltbtn apply" onclick="loteAplicar()">✓ Aplicar todos</button>
+      </div>
+    </div>
+  </div>
+</div>
 </body>
 </html>
