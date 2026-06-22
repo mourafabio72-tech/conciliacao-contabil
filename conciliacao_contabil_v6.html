@@ -82,6 +82,22 @@ select:focus,input:focus{border-color:var(--accent2);box-shadow:0 0 0 2px rgba(4
 .tf-tipo{min-width:185px;}
 .tf-date{width:132px;}
 .tf-filial{width:85px;}
+
+/* CONTA CONTÁBIL — dropdown multi-seleção (checkboxes) */
+.tf-conta-wrap{position:relative;}
+.tf-conta-btn{min-width:250px;max-width:320px;height:33px;font-size:12px;padding:0 10px;border:1px solid var(--border2);border-radius:4px;background:var(--surface);color:var(--text);font-family:var(--font);cursor:pointer;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tf-conta-btn:hover{border-color:var(--accent2);}
+.tf-conta-dropdown{display:none;position:absolute;top:100%;left:0;z-index:60;background:var(--surface);border:1px solid var(--border2);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:8px;width:340px;margin-top:4px;}
+.tf-conta-dropdown.open{display:block;}
+.tf-conta-busca{width:100%;padding:5px 8px;border:1px solid var(--border2);border-radius:4px;font-size:12px;font-family:var(--font);margin-bottom:6px;box-sizing:border-box;}
+.tf-conta-actions{display:flex;gap:6px;margin-bottom:6px;}
+.tf-conta-actions button{flex:1;padding:4px 6px;font-size:11px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);cursor:pointer;font-family:var(--font);}
+.tf-conta-actions button:hover{background:var(--border);}
+.tf-conta-list{max-height:230px;overflow-y:auto;border-top:1px solid var(--border);padding-top:4px;}
+.tf-conta-item{display:flex;align-items:center;gap:6px;padding:3px 4px;cursor:pointer;font-size:11px;border-radius:3px;}
+.tf-conta-item:hover{background:var(--surface2);}
+.tf-conta-item .cod{font-family:var(--mono);color:var(--text3);font-size:10px;white-space:nowrap;}
+.tf-conta-item .desc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .tf-sep{font-size:12px;color:var(--text3);padding-bottom:7px;}
 .tf-btns{display:flex;gap:6px;align-items:flex-end;margin-left:auto;}
 .tfbtn{height:33px;padding:0 14px;border:none;border-radius:4px;font-size:12px;font-family:var(--font);cursor:pointer;white-space:nowrap;transition:background .15s;}
@@ -342,9 +358,17 @@ td.cred{color:#8a1a1a;}
             <option value="2.2.4">Outros Passivos (2.2.4)</option>
           </select>
         </div>
-        <div class="tfg">
+        <div class="tfg tf-conta-wrap">
           <label>Conta Contábil</label>
-          <select class="tf-conta" id="tf-conta"><option value="">Todas as contas</option></select>
+          <button type="button" class="tf-conta-btn" id="tf-conta-btn" onclick="toggleContaDropdown()">Todas as contas ▾</button>
+          <div class="tf-conta-dropdown" id="tf-conta-dropdown">
+            <input type="text" class="tf-conta-busca" id="tf-conta-busca" placeholder="🔍 buscar conta ou descrição..." oninput="renderContaCheckboxes()">
+            <div class="tf-conta-actions">
+              <button type="button" onclick="contaMarcarTodas(true)">Marcar todas</button>
+              <button type="button" onclick="contaMarcarTodas(false)">Nenhuma</button>
+            </div>
+            <div class="tf-conta-list" id="tf-conta-list"></div>
+          </div>
         </div>
         <div class="tfg">
           <label>Filial</label>
@@ -424,6 +448,19 @@ td.cred{color:#8a1a1a;}
       <div class="ca" id="panel-resumo">
         <div class="sgrid" id="sgrid"></div>
         <div id="stbl"></div>
+        <div style="margin-top:1.2rem;display:flex;align-items:center;gap:8px;">
+          <button class="bsm" id="resumo-toggle-abertos" onclick="toggleResumoAbertos()">👁 Mostrar itens em aberto</button>
+          <span style="font-size:11px;color:var(--text3)">Detalhamento dos itens em aberto da conta/filtro atual, sem precisar trocar de aba.</span>
+        </div>
+        <div class="tw" id="resumo-abertos-wrap" style="display:none;margin-top:.6rem;">
+          <table>
+            <thead><tr>
+              <th>Data</th><th>NF / Doc</th><th>Razão Social</th><th>Conta</th>
+              <th>Histórico</th><th>Débito</th><th>Crédito</th><th>Saldo Aberto</th><th>Status</th>
+            </tr></thead>
+            <tbody id="tb-resumo-abertos"></tbody>
+          </table>
+        </div>
       </div>
 
       <div class="ca" id="panel-concil" style="display:none">
@@ -756,6 +793,11 @@ async function setSystem(s){
 // ── STATE ─────────────────────────────────────────────────────────────────
 let allData=[], filtData=[], pares=[], statusF='all', sortSt={}, saldosAbertura={}, composicaoItens={}, finData={rec:[], pag:[]}; // composicaoItens: {conta_cod: [{nf,razao,valor,data}]}
 let tributData=[], tributMeses=[], tributMesAtivo=null; // módulo IRPJ/CSLL — Lucro Real anual
+// Contas marcadas no filtro "Conta Contábil" (multi-seleção via checkbox).
+// null = sem filtro (todas implícitas); Set (mesmo vazio) = seleção explícita.
+let _contasFiltro = null;
+// Exibir/ocultar a lista detalhada de itens em aberto dentro da aba Resumo.
+let _resumoAbertosVisivel = false;
 
 // ── EMPRESA ATIVA (multiempresa) ─────────────────────────────────────────
 let _empresaAtual = '';
@@ -1665,50 +1707,148 @@ function popFilts(){
   const contas=[...new Set(allData.map(t=>t.conta_cod).filter(Boolean))].sort();
   const filiais=[...new Set(allData.map(t=>t.filial).filter(Boolean))].sort();
   const dates=allData.map(t=>t.data).filter(Boolean).sort((a,b)=>a-b);
-  const optC='<option value="">Todas as contas</option>'+contas.map(c=>{const t=allData.find(x=>x.conta_cod===c);return`<option value="${c}">${c} — ${t?t.conta_desc:''}</option>`;}).join('');
-  document.getElementById('tf-conta').innerHTML=optC;
   document.getElementById('f-conta').innerHTML='<option value="">Todas</option>'+contas.map(c=>{const t=allData.find(x=>x.conta_cod===c);return`<option value="${c}">${c} — ${t?t.conta_desc:''}</option>`;}).join('');
   const optF='<option value="">Todas</option>'+filiais.map(f=>`<option value="${f}">${f}</option>`).join('');
   document.getElementById('tf-filial').innerHTML=document.getElementById('f-filial').innerHTML=optF;
   if(dates.length){const ini=dates[0].toISOString().split('T')[0],fim=dates[dates.length-1].toISOString().split('T')[0];['tf-ini','f-ini'].forEach(id=>document.getElementById(id).value=ini);['tf-fim','f-fim'].forEach(id=>document.getElementById(id).value=fim);}
+  // Novo conjunto de dados → volta para "todas as contas" no filtro multi-seleção.
+  _contasFiltro=null;
+  updateContaBtnLabel();
+  renderContaCheckboxes();
+}
+
+// ── CONTA CONTÁBIL — dropdown multi-seleção (checkboxes) ──────────────────
+function contaListaDisponivel(){
+  const tipo=document.getElementById('tf-tipo')?.value||'';
+  const c=[...new Set(allData.map(t=>t.conta_cod).filter(Boolean))].sort();
+  return tipo?c.filter(x=>x.startsWith(tipo)):c;
 }
 
 function syncConta(){
-  const tipo=document.getElementById('tf-tipo').value;
-  const c=[...new Set(allData.map(t=>t.conta_cod).filter(Boolean))].sort();
-  const fc=tipo?c.filter(x=>x.startsWith(tipo)):c;
-  document.getElementById('tf-conta').innerHTML='<option value="">Todas as contas</option>'+fc.map(c=>{const t=allData.find(x=>x.conta_cod===c);return`<option value="${c}">${c} — ${t?t.conta_desc:''}</option>`;}).join('');
+  // Mudou o "Tipo de Conta": a lista de contas disponíveis muda, então volta
+  // para "todas" dentro do novo recorte (evita ficar com seleção órfã).
+  _contasFiltro=null;
+  updateContaBtnLabel();
+  renderContaCheckboxes();
+}
+
+function toggleContaDropdown(open){
+  const dd=document.getElementById('tf-conta-dropdown');
+  if(!dd) return;
+  const show = open===undefined ? !dd.classList.contains('open') : open;
+  dd.classList.toggle('open', show);
+  if(show){ renderContaCheckboxes(); document.getElementById('tf-conta-busca').focus(); }
+}
+document.addEventListener('click', e=>{
+  const dd=document.getElementById('tf-conta-dropdown'), btn=document.getElementById('tf-conta-btn');
+  if(dd && dd.classList.contains('open') && !dd.contains(e.target) && e.target!==btn) dd.classList.remove('open');
+});
+
+function renderContaCheckboxes(){
+  const list=document.getElementById('tf-conta-list');
+  if(!list) return;
+  const contas=contaListaDisponivel();
+  list.innerHTML = contas.length ? contas.map(c=>{
+    const t=allData.find(x=>x.conta_cod===c);
+    const desc=t?t.conta_desc:'';
+    const checked=(_contasFiltro===null||_contasFiltro.has(c))?'checked':'';
+    return `<label class="tf-conta-item" title="${c} — ${String(desc).replace(/"/g,'&quot;')}">
+      <input type="checkbox" value="${c}" ${checked} onchange="contaToggle('${c}',this.checked)">
+      <span class="cod">${c}</span><span class="desc">${desc}</span>
+    </label>`;
+  }).join('') : '<div style="padding:8px;font-size:11px;color:var(--text3);">Nenhuma conta carregada</div>';
+  contaFiltrarBusca();
+  updateContaBtnLabel();
+}
+
+function contaFiltrarBusca(){
+  const q=(document.getElementById('tf-conta-busca')?.value||'').toLowerCase();
+  document.querySelectorAll('#tf-conta-list .tf-conta-item').forEach(lbl=>{
+    lbl.style.display = (!q || lbl.textContent.toLowerCase().includes(q)) ? '' : 'none';
+  });
+}
+
+function contaToggle(cod, checked){
+  if(_contasFiltro===null) _contasFiltro=new Set(contaListaDisponivel());
+  if(checked) _contasFiltro.add(cod); else _contasFiltro.delete(cod);
+  const disp=contaListaDisponivel();
+  if(disp.length && disp.every(x=>_contasFiltro.has(x))) _contasFiltro=null; // voltou a cobrir todas
+  updateContaBtnLabel();
+  tfAplicar();
+}
+
+function contaMarcarTodas(marcar){
+  _contasFiltro = marcar ? null : new Set();
+  document.querySelectorAll('#tf-conta-list input[type=checkbox]').forEach(cb=>{cb.checked=marcar;});
+  updateContaBtnLabel();
+  tfAplicar();
+}
+
+// Seleção única vinda de outro ponto da UI (ex.: clique na lista lateral de contas).
+function contaSelecionarUnica(cod){
+  _contasFiltro = new Set([cod]);
+  updateContaBtnLabel();
+}
+
+function getContaSelecionadaUnica(){
+  return (_contasFiltro!==null && _contasFiltro.size===1) ? [..._contasFiltro][0] : '';
+}
+
+function updateContaBtnLabel(){
+  const btn=document.getElementById('tf-conta-btn');
+  if(!btn) return;
+  let lbl;
+  if(_contasFiltro===null) lbl='Todas as contas';
+  else if(_contasFiltro.size===0) lbl='Nenhuma conta';
+  else if(_contasFiltro.size===1){
+    const c=[..._contasFiltro][0], t=allData.find(x=>x.conta_cod===c);
+    lbl=c+(t?' — '+t.conta_desc:'');
+  } else lbl=_contasFiltro.size+' contas selecionadas';
+  btn.textContent=lbl+' ▾';
+  btn.title=lbl;
 }
 
 function tfAplicar(){
-  const tipo=document.getElementById('tf-tipo').value,conta=document.getElementById('tf-conta').value;
+  const tipo=document.getElementById('tf-tipo').value;
   const filial=document.getElementById('tf-filial').value;
   const ini=document.getElementById('tf-ini').value,fim=document.getElementById('tf-fim').value;
   const dI=ini?new Date(ini):null,dF=fim?new Date(fim):null;
   filtData=allData.filter(t=>{
     if(dI&&t.data<dI)return false;if(dF&&t.data>dF)return false;
     if(tipo&&t.conta_cod&&!t.conta_cod.startsWith(tipo))return false;
-    if(conta&&t.conta_cod!==conta)return false;
+    if(_contasFiltro!==null&&!_contasFiltro.has(t.conta_cod))return false;
     if(filial&&t.filial!==filial)return false;
     return true;
   });
-  ['f-tipo','f-conta','f-filial','f-ini','f-fim'].forEach((id,i)=>{document.getElementById(id).value=[tipo,conta,filial,ini,fim][i];});
-  // Atualizar conta atual para o saldo de abertura
-  setContaAtual(conta);
+  document.getElementById('f-tipo').value=tipo;
+  document.getElementById('f-filial').value=filial;
+  document.getElementById('f-ini').value=ini;
+  document.getElementById('f-fim').value=fim;
+  // Saldo de abertura / saldo corrente só fazem sentido com EXATAMENTE 1 conta
+  // marcada — com 0, 2+ ou "todas", ficam desabilitados (igual a antes).
+  setContaAtual(getContaSelecionadaUnica());
   renderAll();renderTags();
 }
 
 function tfLimpar(){
-  ['tf-tipo','tf-conta','tf-filial'].forEach(id=>document.getElementById(id).value='');
-  syncConta();filtData=[...allData];setContaAtual('');popFilts();renderAll();renderTags();
+  document.getElementById('tf-tipo').value='';
+  document.getElementById('tf-filial').value='';
+  _contasFiltro=null;
+  updateContaBtnLabel();
+  renderContaCheckboxes();
+  filtData=[...allData];setContaAtual('');popFilts();renderAll();renderTags();
 }
 
 function renderTags(){
-  const tipo=document.getElementById('tf-tipo').value,conta=document.getElementById('tf-conta').value;
+  const tipo=document.getElementById('tf-tipo').value;
   const filial=document.getElementById('tf-filial').value,ini=document.getElementById('tf-ini').value,fim=document.getElementById('tf-fim').value;
   const tags=[];
   if(tipo)tags.push({l:'Tipo: '+document.getElementById('tf-tipo').options[document.getElementById('tf-tipo').selectedIndex].text,c:()=>{document.getElementById('tf-tipo').value='';syncConta();tfAplicar();}});
-  if(conta)tags.push({l:'Conta: '+conta,c:()=>{document.getElementById('tf-conta').value='';tfAplicar();}});
+  if(_contasFiltro!==null){
+    const n=_contasFiltro.size;
+    const lbl = n===0 ? 'Nenhuma conta selecionada' : n===1 ? 'Conta: '+[..._contasFiltro][0] : n+' contas selecionadas';
+    tags.push({l:lbl,c:()=>{_contasFiltro=null;updateContaBtnLabel();renderContaCheckboxes();tfAplicar();}});
+  }
   if(filial)tags.push({l:'Filial: '+filial,c:()=>{document.getElementById('tf-filial').value='';tfAplicar();}});
   if(ini||fim)tags.push({l:'Período: '+(ini||'…')+' → '+(fim||'…'),c:()=>{const d=allData.map(t=>t.data).filter(Boolean).sort((a,b)=>a-b);if(d.length){document.getElementById('tf-ini').value=d[0].toISOString().split('T')[0];document.getElementById('tf-fim').value=d[d.length-1].toISOString().split('T')[0];}tfAplicar();}});
   const row=document.getElementById('tagsrow');
@@ -1774,7 +1914,7 @@ function renderAccList(){
   sorted.slice(0,120).forEach(c=>{
     const div=document.createElement('div');div.className='acc-item';
     div.innerHTML=`<span class="acc-code">${c.cod}</span><span class="acc-name">${c.desc}</span>${c.open>0?`<span class="acc-bdg bdg-open">${c.open} aberto(s)</span>`:'<span class="acc-bdg bdg-ok">ok</span>'}`;
-    div.onclick=()=>{document.querySelectorAll('.acc-item').forEach(i=>i.classList.remove('active'));div.classList.add('active');document.getElementById('tf-conta').value=c.cod;document.getElementById('f-conta').value=c.cod;tfAplicar();};
+    div.onclick=()=>{document.querySelectorAll('.acc-item').forEach(i=>i.classList.remove('active'));div.classList.add('active');contaSelecionarUnica(c.cod);document.getElementById('f-conta').value=c.cod;tfAplicar();};
     list.appendChild(div);
   });
 }
@@ -1795,9 +1935,9 @@ function renderResumo(){
     <div class="scard"><h3>Retenções (NF vs Rec.)</h3><div class="v ret">${rets.length} ocorr.</div><div class="sv">${fBRL(rets.reduce((s,t)=>s+t.ret_val,0))} retidos</div></div>
     <div class="scard"><h3>Saldos de Abertura</h3><div class="v warn">${Object.keys(saldosAbertura).length>0?Object.keys(saldosAbertura).length+' conta(s)':'Não informado'}</div><div class="sv">${Object.keys(saldosAbertura).length>0?'ref. 31/12/2025 — '+fBRL(Object.values(saldosAbertura).reduce((s,v)=>s+v,0)):'Informe no campo acima'}</div></div>`;
   // Agrupar pela conta COMPLETA (não mais por prefixo de 5 chars): assim, se
-  // houver uma conta filtrada (tf-conta), `open` já vem só dela e aparece uma
-  // única linha com a própria conta; se o filtro estiver em "Todas as contas",
-  // aparece uma linha por conta com item em aberto.
+  // houver conta(s) marcada(s) no filtro de Conta Contábil, `open` já vem só
+  // delas; se estiver em "Todas as contas", aparece uma linha por conta com
+  // item em aberto.
   const gm={};
   open.forEach(t=>{
     const k=t.conta_cod||'?';
@@ -1807,6 +1947,8 @@ function renderResumo(){
   let h='<table style="width:100%"><thead><tr><th>Conta</th><th>Qtd. Em Aberto</th><th>Valor em Aberto</th></tr></thead><tbody>';
   Object.entries(gm).sort((a,b)=>b[1].v-a[1].v).forEach(([k,v])=>{h+=`<tr><td><strong>${v.desc||'—'}</strong> <span class="tag">${k}</span></td><td class="mo rt">${v.n}</td><td class="mo rt warn">${fBRL(v.v)}</td></tr>`;});
   document.getElementById('stbl').innerHTML=h+'</tbody></table>';
+  // Mantém o detalhamento inline (se estiver aberto) sincronizado com o filtro atual.
+  if(_resumoAbertosVisivel) renderResumoAbertos();
 }
 
 // ── CONCILIAÇÃO ───────────────────────────────────────────────────────────
@@ -1976,6 +2118,22 @@ function getItensAbertos(){
   return base;
 }
 
+// Linhas <tr> compartilhadas entre a aba "Em Aberto" e o detalhamento inline
+// da aba Resumo — evita duplicar o mesmo markup nos dois lugares.
+function abertosLinhasHTML(d){
+  return d.map(t=>`<tr class="r-open">
+    <td class="mo">${fDate(t.data)}</td>
+    <td class="mo" style="font-weight:bold;color:var(--info)">${t.nf||'—'}</td>
+    <td class="rcell">${t.razao_social||'—'}</td>
+    <td class="mo" style="font-size:10px">${t.conta_cod||''}</td>
+    <td class="hcell">${t.historico}</td>
+    <td class="rt mo deb">${t.debito>0?fBRL(t.debito):'—'}</td>
+    <td class="rt mo cred">${t.credito>0?fBRL(t.credito):'—'}</td>
+    <td class="rt mo warn">${fBRL(t.saldo_aberto||t.debito||t.credito)}</td>
+    <td>${sBadge(t)}</td>
+  </tr>`).join('');
+}
+
 function renderAbertos(){
   const d = getItensAbertos();
   const tb = document.getElementById('tb-abertos');
@@ -1987,23 +2145,35 @@ function renderAbertos(){
   // Totalizador no rodapé
   const totalAberto = d.reduce((s,t)=>s+(t.saldo_aberto||t.debito||0),0);
 
-  tb.innerHTML = d.slice(0,1000).map(t=>`<tr class="r-open">
-    <td class="mo">${fDate(t.data)}</td>
-    <td class="mo" style="font-weight:bold;color:var(--info)">${t.nf||'—'}</td>
-    <td class="rcell">${t.razao_social||'—'}</td>
-    <td class="mo" style="font-size:10px">${t.conta_cod||''}</td>
-    <td class="hcell">${t.historico}</td>
-    <td class="rt mo deb">${t.debito>0?fBRL(t.debito):'—'}</td>
-    <td class="rt mo cred">${t.credito>0?fBRL(t.credito):'—'}</td>
-    <td class="rt mo warn">${fBRL(t.saldo_aberto||t.debito||t.credito)}</td>
-    <td>${sBadge(t)}</td>
-  </tr>`).join('') +
+  tb.innerHTML = abertosLinhasHTML(d.slice(0,1000)) +
   `<tr style="background:var(--surface2);font-weight:bold;border-top:2px solid var(--border);">
     <td colspan="7" style="text-align:right;font-size:11px;color:var(--text2);padding:8px 9px;">TOTAL EM ABERTO</td>
     <td class="rt mo warn" style="font-size:13px;">${fBRL(totalAberto)}</td>
     <td></td>
   </tr>`;
 
+  if(d.length>1000) tb.innerHTML+=`<tr><td colspan="9" style="text-align:center;font-size:11px;color:var(--text3);padding:.5rem">Exibindo 1000 de ${d.length}.</td></tr>`;
+}
+
+// ── RESUMO: detalhamento inline de itens em aberto (opcional, sem trocar aba) ─
+function toggleResumoAbertos(){
+  _resumoAbertosVisivel = !_resumoAbertosVisivel;
+  const wrap = document.getElementById('resumo-abertos-wrap');
+  const btn  = document.getElementById('resumo-toggle-abertos');
+  if(wrap) wrap.style.display = _resumoAbertosVisivel ? '' : 'none';
+  if(btn)  btn.textContent = _resumoAbertosVisivel ? '🙈 Ocultar itens em aberto' : '👁 Mostrar itens em aberto';
+  if(_resumoAbertosVisivel) renderResumoAbertos();
+}
+
+function renderResumoAbertos(){
+  const tb = document.getElementById('tb-resumo-abertos');
+  if(!tb) return;
+  const d = getItensAbertos();
+  if(!d.length){
+    tb.innerHTML='<tr><td colspan="9" style="text-align:center;padding:1.4rem;color:var(--text3)">Nenhum item em aberto no filtro atual.</td></tr>';
+    return;
+  }
+  tb.innerHTML = abertosLinhasHTML(d.slice(0,1000));
   if(d.length>1000) tb.innerHTML+=`<tr><td colspan="9" style="text-align:center;font-size:11px;color:var(--text3);padding:.5rem">Exibindo 1000 de ${d.length}.</td></tr>`;
 }
 
@@ -3495,7 +3665,7 @@ function loteAplicar(){
   persistSaldos();
   fecharSaldosLote();
   // Mudar o filtro para "Todas as contas" e renderizar tudo conciliado
-  const sel = document.getElementById('tf-conta'); if(sel) sel.value='';
+  _contasFiltro=null; updateContaBtnLabel(); renderContaCheckboxes();
   syncSaldoBar(); renderBadges();
   if(typeof tfAplicar==='function') tfAplicar(); else renderAll();
   const n = Object.keys(desired).length;
