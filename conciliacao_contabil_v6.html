@@ -4,9 +4,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Conciliação Contábil — Protheus / Domínio</title>
+<script>
+// Aplica o tema salvo ANTES do CSS pintar a tela, evitando o "flash" de
+// tema claro seguido de troca para escuro quando o usuário prefere escuro.
+(function(){
+  try{
+    var t = localStorage.getItem('cc_theme');
+    if(t==='dark') document.documentElement.setAttribute('data-theme','dark');
+  }catch(e){}
+})();
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root {
+  color-scheme: light;
   --bg:#f5f4f0;--surface:#fff;--surface2:#f9f8f5;--border:#e2e0d8;--border2:#ccc9be;
   --text:#1a1916;--text2:#5a5852;--text3:#8a877e;
   --accent:#1a5c3a;--accent2:#2d8a5a;--accent-bg:#e8f5ee;
@@ -14,13 +25,37 @@
   --danger:#8a1a1a;--danger-bg:#fde8e8;
   --info:#1a3a8a;--info-bg:#e8eefe;
   --ret:#6b3fa0;--ret-bg:#f0eafa;
+  --partial:#c47a00;
+  --row-open-bg:#fff8f5;--row-open-hover:#ffeedc;--row-open-border:#d85a30;
+  --saldo-bg:#fffbf0;--saldo-border:#e8d88a;--saldo-lbl-bg:#fff8e0;--saldo-input-border:#c8a800;
+  --saldo-hdr-bg:#fff3cd;--key-row-bg:#e8f5e9;
+  --neutral:#999;--neutral2:#888;--tribut:#1a5276;--warn-hover:#6a3800;
+  --ret-border:#c9a8e8;--chip-border:#c8e6d4;--danger-border:#e8a8a8;
   --font:'Trebuchet MS',Trebuchet,Arial,sans-serif;--mono:'Courier New',monospace;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --bg:#15181c;--surface:#1d2127;--surface2:#262b32;--border:#333a44;--border2:#454c58;
+  --text:#e7e5e0;--text2:#a8aeb6;--text3:#737a83;
+  --accent:#34b079;--accent2:#46d695;--accent-bg:#163428;
+  --warn:#e0a23a;--warn-bg:#3a2c12;
+  --danger:#e2655d;--danger-bg:#3a1a18;
+  --info:#5fa0f5;--info-bg:#172943;
+  --ret:#b78cf2;--ret-bg:#2b2040;
+  --partial:#dd9b32;
+  --row-open-bg:#2c2220;--row-open-hover:#3a2a23;--row-open-border:#e07050;
+  --saldo-bg:#2a2614;--saldo-border:#5c4f22;--saldo-lbl-bg:#332b14;--saldo-input-border:#8a7320;
+  --saldo-hdr-bg:#352c12;--key-row-bg:#162a1d;
+  --neutral:#5a6168;--neutral2:#4a5158;--tribut:#5aa9d8;--warn-hover:#b9842c;
+  --ret-border:#5c3f7d;--chip-border:#2f5a44;--danger-border:#5c3230;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.6;}
 header{background:var(--accent);color:white;padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:56px;border-bottom:3px solid #0f3d27;}
 header h1{font-size:15px;font-weight:normal;letter-spacing:.08em;text-transform:uppercase;}
 header .ver{font-size:11px;opacity:.6;letter-spacing:.04em;}
+.theme-toggle-btn{height:28px;padding:0 12px;border:1px solid rgba(255,255,255,.3);border-radius:14px;background:rgba(255,255,255,.1);color:#fff;font-size:11px;font-family:var(--font);cursor:pointer;white-space:nowrap;transition:background .15s;}
+.theme-toggle-btn:hover{background:rgba(255,255,255,.22);}
 .sys-sel-bar{background:#0f3d27;border-bottom:2px solid #07261a;padding:7px 2rem;display:flex;align-items:center;gap:10px;flex-shrink:0;}
 .sys-sel-bar label{font-size:11px;color:rgba(255,255,255,.6);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;}
 .sys-btn{padding:5px 14px;border:1px solid rgba(255,255,255,.25);border-radius:4px;background:transparent;color:rgba(255,255,255,.6);font-size:11px;font-family:var(--font);cursor:pointer;letter-spacing:.04em;transition:all .15s;white-space:nowrap;}
@@ -32,13 +67,13 @@ header .ver{font-size:11px;opacity:.6;letter-spacing:.04em;}
 .empresa-bar{background:#143d2c;border-bottom:2px solid #07261a;padding:7px 2rem;display:flex;align-items:center;gap:10px;flex-shrink:0;}
 .empresa-bar label{font-size:11px;color:rgba(255,255,255,.6);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;}
 .empresa-bar select{width:auto;min-width:220px;max-width:340px;font-size:12px;padding:5px 8px;background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.25);}
-.empresa-bar select option{color:#1a1916;}
+.empresa-bar select option{color:var(--text);background:var(--surface);}
 .empresa-bar select:focus{border-color:rgba(255,255,255,.6);box-shadow:none;}
 #empresa-info{margin-left:auto;font-size:11px;color:rgba(255,255,255,.55);white-space:nowrap;}
 .empresa-display{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:bold;background:rgba(255,255,255,.12);border-radius:4px;padding:3px 10px;margin-left:12px;letter-spacing:.02em;}
 .empresa-display:empty{display:none;}
 
-.periodo-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-family:var(--mono);background:var(--accent-bg);color:var(--accent);border:1px solid #c8e6d4;border-radius:3px;padding:2px 6px 2px 8px;}
+.periodo-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-family:var(--mono);background:var(--accent-bg);color:var(--accent);border:1px solid var(--chip-border);border-radius:3px;padding:2px 6px 2px 8px;}
 .periodo-chip .rm{cursor:pointer;color:var(--danger);font-weight:bold;padding:0 2px;}
 .periodo-chip .rm:hover{text-decoration:underline;}
 
@@ -107,12 +142,12 @@ select:focus,input:focus{border-color:var(--accent2);box-shadow:0 0 0 2px rgba(4
 .tfbtn.clear:hover{background:var(--border);}
 
 /* SALDO ABERTURA */
-.saldo-bar{background:#fffbf0;border-bottom:1px solid #e8d88a;padding:7px 1.4rem;display:flex;align-items:center;gap:14px;flex-wrap:wrap;flex-shrink:0;}
+.saldo-bar{background:var(--saldo-bg);border-bottom:1px solid var(--saldo-border);padding:7px 1.4rem;display:flex;align-items:center;gap:14px;flex-wrap:wrap;flex-shrink:0;}
 .saldo-bar label{font-size:11px;color:var(--warn);white-space:nowrap;font-weight:bold;}
-.saldo-bar input[type=number]{width:155px;height:29px;font-size:12px;padding:0 8px;border:1px solid #c8a800;border-radius:4px;font-family:var(--mono);}
+.saldo-bar input[type=number]{width:155px;height:29px;font-size:12px;padding:0 8px;border:1px solid var(--saldo-input-border);border-radius:4px;font-family:var(--mono);background:var(--surface);color:var(--text);}
 .saldo-bar .sbtn{height:29px;padding:0 12px;background:var(--warn);color:white;border:none;border-radius:4px;font-size:11px;font-family:var(--font);cursor:pointer;}
-.saldo-bar .sbtn:hover{background:#6a3800;}
-.saldo-badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:4px;background:var(--warn-bg);border:1px solid #e8d88a;font-size:12px;font-family:var(--mono);color:var(--warn);}
+.saldo-bar .sbtn:hover{background:var(--warn-hover);}
+.saldo-badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:4px;background:var(--warn-bg);border:1px solid var(--saldo-border);font-size:12px;font-family:var(--mono);color:var(--warn);}
 .saldo-badge .rm{cursor:pointer;opacity:.6;margin-left:4px;font-size:13px;}
 .saldo-badge .rm:hover{opacity:1;}
 .saldo-hint{font-size:11px;color:var(--text3);}
@@ -150,7 +185,7 @@ select:focus,input:focus{border-color:var(--accent2);box-shadow:0 0 0 2px rgba(4
 .chip.match-c.active{background:var(--accent2);border-color:var(--accent2);}
 .dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:2px;}
 .d-open{background:var(--danger);}
-.d-partial{background:#c47a00;}
+.d-partial{background:var(--partial);}
 .d-match{background:var(--accent2);}
 .d-ret{background:var(--ret);}
 .d-ant{background:var(--info);}
@@ -169,17 +204,17 @@ thead th{background:var(--surface2);padding:7px 9px;text-align:left;font-size:10
 thead th:hover{background:var(--accent-bg);}
 tbody tr{border-bottom:1px solid var(--border);transition:background .1s;}
 tbody tr:hover{background:var(--surface2);}
-tbody tr.r-open{background:#fff8f5;}
-tbody tr.r-open:hover{background:#ffeedc;}
-tbody tr.r-open td:first-child{border-left:3px solid #d85a30;}
+tbody tr.r-open{background:var(--row-open-bg);}
+tbody tr.r-open:hover{background:var(--row-open-hover);}
+tbody tr.r-open td:first-child{border-left:3px solid var(--row-open-border);}
 tbody tr.r-match td:first-child{border-left:3px solid var(--accent2);}
 tbody tr.r-ret td:first-child{border-left:3px solid var(--ret);}
 tbody tr.r-ant td:first-child{border-left:3px solid var(--info);}
 td{padding:6px 9px;vertical-align:middle;}
 td.mo{font-family:var(--mono);font-size:11px;}
 td.rt{text-align:right;}
-td.deb{color:#1a5c3a;}
-td.cred{color:#8a1a1a;}
+td.deb{color:var(--accent);}
+td.cred{color:var(--danger);}
 .hcell{max-width:210px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;}
 .rcell{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;}
 
@@ -188,7 +223,7 @@ td.cred{color:#8a1a1a;}
 .sb-open{background:var(--danger-bg);color:var(--danger);}
 .sb-closed{background:var(--accent-bg);color:var(--accent);}
 .sb-partial{background:var(--warn-bg);color:var(--warn);}
-.sb-match{background:#e8f5ee;color:#1a5c3a;}
+.sb-match{background:var(--accent-bg);color:var(--accent);}
 .sb-ret{background:var(--ret-bg);color:var(--ret);}
 .sb-ant{background:var(--info-bg);color:var(--info);}
 .sb-na{background:var(--border);color:var(--text3);}
@@ -205,7 +240,7 @@ td.cred{color:#8a1a1a;}
 .scard .sv{font-size:11px;color:var(--text3);}
 
 /* RET SECTION */
-.ret-box{background:var(--ret-bg);border:1px solid #c9a8e8;border-radius:6px;padding:.9rem;margin-bottom:1.4rem;}
+.ret-box{background:var(--ret-bg);border:1px solid var(--ret-border);border-radius:6px;padding:.9rem;margin-bottom:1.4rem;}
 .ret-box h2{font-size:11px;color:var(--ret);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.7rem;}
 
 /* EMPTY/LOADING */
@@ -245,7 +280,10 @@ td.cred{color:#8a1a1a;}
     <h1>Conciliação Contábil</h1>
     <span class="empresa-display" id="empresa-display"></span>
   </div>
-  <span class="ver">Razão Analítico — MKB e Domínio · v3.0</span>
+  <div style="display:flex;align-items:center;gap:14px;">
+    <span class="ver">Razão Analítico — MKB e Domínio · v3.0</span>
+    <button type="button" id="theme-toggle-btn" class="theme-toggle-btn" onclick="toggleTheme()" title="Alternar tema claro/escuro">🌙 Escuro</button>
+  </div>
 </header>
 
 <div class="empresa-bar">
@@ -378,7 +416,7 @@ td.cred{color:#8a1a1a;}
       <!-- SALDO ABERTURA -->
       <div class="saldo-bar" id="saldo-bar">
         <label id="saldo-nat-label">Saldo de Abertura (31/12/2025):</label>
-        <div id="saldo-conta-lbl" style="font-size:11px;color:var(--warn);font-family:var(--mono);background:#fff8e0;border:1px solid #e8d88a;border-radius:4px;padding:2px 8px;white-space:nowrap;">
+        <div id="saldo-conta-lbl" style="font-size:11px;color:var(--warn);font-family:var(--mono);background:var(--saldo-lbl-bg);border:1px solid var(--saldo-border);border-radius:4px;padding:2px 8px;white-space:nowrap;">
           Selecione uma conta contábil
         </div>
         <input type="number" id="saldo-in" step="0.01" placeholder="Ex: 886015.17" disabled style="opacity:.5">
@@ -386,10 +424,10 @@ td.cred{color:#8a1a1a;}
         <div style="width:1px;height:24px;background:var(--border2);margin:0 4px;"></div>
         <button class="sbtn" id="saldo-lote-btn" onclick="abrirSaldosLote()" style="background:var(--accent);font-weight:bold;">📋 Saldos em lote</button>
         <div style="width:1px;height:24px;background:var(--border2);margin:0 4px;"></div>
-        <button class="sbtn" id="comp-btn" onclick="document.getElementById('comp-fi').click()" disabled style="opacity:.5;background:#6b3fa0;">📎 Composição</button>
+        <button class="sbtn" id="comp-btn" onclick="document.getElementById('comp-fi').click()" disabled style="opacity:.5;background:var(--ret);">📎 Composição</button>
         <input type="file" id="comp-fi" accept=".xlsx,.xls,.csv" style="display:none" onchange="loadComposicao(this)">
         <div id="comp-lbl" style="font-size:11px;color:var(--ret);display:none;"></div>
-        <button class="sbtn" id="comp-clear-btn" onclick="clearComposicao()" style="display:none;background:#999;font-size:10px;padding:0 8px;">✕ Composição</button>
+        <button class="sbtn" id="comp-clear-btn" onclick="clearComposicao()" style="display:none;background:var(--neutral);font-size:10px;padding:0 8px;">✕ Composição</button>
         <div id="saldo-bdg" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
         <span id="saldo-hint" class="saldo-hint">ℹ️ Conta única: selecione uma conta acima. Para informar <strong>todas de uma vez</strong>, use <strong>📋 Saldos em lote</strong>.</span>
       </div>
@@ -403,9 +441,9 @@ td.cred{color:#8a1a1a;}
         <button class="ptab" onclick="showP('razao')">Razão Completo</button>
         <button class="ptab" onclick="showP('contas')">Por Conta</button>
         <button class="ptab" style="background:var(--accent);color:white;border-radius:4px 4px 0 0;font-weight:bold;" onclick="showP('resultado')">★ Resultado Final</button>
-        <button class="ptab" style="background:#8a1a1a;color:white;border-radius:4px 4px 0 0;font-weight:bold;" onclick="showP('diverg')">⚠ Divergências</button>
+        <button class="ptab" style="background:var(--danger);color:white;border-radius:4px 4px 0 0;font-weight:bold;" onclick="showP('diverg')">⚠ Divergências</button>
         <button class="ptab" style="background:var(--info);color:white;border-radius:4px 4px 0 0;font-weight:bold;" onclick="showP('validfin')">🔗 Validação Financeiro</button>
-        <button class="ptab" style="background:#1a5276;color:white;border-radius:4px 4px 0 0;font-weight:bold;" onclick="showP('tribut')">📊 IRPJ/CSLL</button>
+        <button class="ptab" style="background:var(--tribut);color:white;border-radius:4px 4px 0 0;font-weight:bold;" onclick="showP('tribut')">📊 IRPJ/CSLL</button>
       </div>
 
       <!-- METRICS -->
@@ -554,7 +592,7 @@ td.cred{color:#8a1a1a;}
 
       <!-- DIVERGÊNCIAS -->
       <div class="ca" id="panel-diverg" style="display:none">
-        <div style="background:var(--danger-bg);border:1px solid #e8a8a8;border-radius:6px;padding:.9rem;margin-bottom:1rem;">
+        <div style="background:var(--danger-bg);border:1px solid var(--danger-border);border-radius:6px;padding:.9rem;margin-bottom:1rem;">
           <div style="font-size:13px;font-weight:bold;color:var(--danger);margin-bottom:4px">⚠ Lançamentos sem contrapartida identificada</div>
           <div style="font-size:11px;color:var(--text2)">Créditos com recebimento mas sem NF de débito no período — provavelmente referentes ao saldo anterior não carregado na composição. Débitos sem recebimento correspondente aparecem na aba Em Aberto.</div>
         </div>
@@ -673,7 +711,7 @@ td.cred{color:#8a1a1a;}
         <!-- Upload -->
         <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:1rem;align-items:flex-start;">
           <div style="flex:1;min-width:220px;">
-            <div style="font-size:11px;font-weight:bold;color:#1a5276;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">📊 Planilha ANUAL — Lucro Real (IRPJ / CSLL)</div>
+            <div style="font-size:11px;font-weight:bold;color:var(--tribut);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">📊 Planilha ANUAL — Lucro Real (IRPJ / CSLL)</div>
             <div class="vf-upload-zone" id="trib-upload-zone" onclick="document.getElementById('trib-fi').click()">
               <div style="font-size:18px;margin-bottom:4px">📄</div>
               <div style="font-size:12px;color:var(--text2)"><strong>Carregar planilha ANUAL</strong><br>.xlsx · aba "ANUAL"</div>
@@ -778,6 +816,25 @@ async function setSystem(s){
     }catch(err){ dbErr(err); }
   }
 }
+
+// ── TEMA (claro/escuro) ─────────────────────────────────────────────────────
+// O <head> já aplicou o tema salvo antes da pintura inicial (evita flash);
+// aqui só sincronizamos o botão e tratamos o clique de alternância.
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme', t==='dark' ? 'dark' : 'light');
+  try{ localStorage.setItem('cc_theme', t); }catch(e){}
+  const btn=document.getElementById('theme-toggle-btn');
+  if(btn) btn.textContent = t==='dark' ? '☀️ Claro' : '🌙 Escuro';
+}
+function toggleTheme(){
+  const atual=document.documentElement.getAttribute('data-theme')==='dark' ? 'dark' : 'light';
+  applyTheme(atual==='dark' ? 'light' : 'dark');
+}
+(function initTheme(){
+  let salvo='light';
+  try{ salvo=localStorage.getItem('cc_theme')||'light'; }catch(e){}
+  applyTheme(salvo);
+})();
 
 // ── STATE ─────────────────────────────────────────────────────────────────
 let allData=[], filtData=[], pares=[], statusF='all', sortSt={}, saldosAbertura={}, composicaoItens={}, finData={rec:[], pag:[]}; // composicaoItens: {conta_cod: [{nf,razao,valor,data}]}
@@ -1682,7 +1739,7 @@ function renderBadges(){
     return `<span class="saldo-badge" title="${cod} — ${nm}">
       <span style="font-size:10px;opacity:.7">${cod}</span>
       &nbsp;${fBRL(val)}
-      ${rest>0?`<span style="font-size:10px;color:#c47a00"> | restante: ${fBRL(rest)}</span>`:'<span style="font-size:10px;color:var(--accent)"> ✓ zerado</span>'}
+      ${rest>0?`<span style="font-size:10px;color:var(--partial)"> | restante: ${fBRL(rest)}</span>`:'<span style="font-size:10px;color:var(--accent)"> ✓ zerado</span>'}
       <span class="rm" onclick="remSaldo('${cod}')" title="Remover">✕</span>
     </span>`;
   }).join('');
@@ -2002,7 +2059,7 @@ function renderConcil(){
       const sc = saldoCorrente < 0 ? 'color:var(--danger)' : 'color:var(--warn)';
       const natH = getNatureza(sr.conta);
       const isPassH = natH === 'passivo';
-      html += `<tr style="background:#fff3cd;font-weight:bold;border-left:4px solid #c47a00;">
+      html += `<tr style="background:var(--saldo-hdr-bg);font-weight:bold;border-left:4px solid var(--partial);">
         <td class="mo" style="color:var(--warn)">${sr.data_str}</td>
         <td class="mo" style="color:var(--warn)">—</td>
         <td style="color:var(--warn);font-size:12px" colspan="2">SALDO DE ABERTURA (${isPassH?'PASSIVO':'ATIVO'})</td>
@@ -2026,7 +2083,7 @@ function renderConcil(){
         : `<span class="sb sb-open">Em aberto</span>`;
       // Mostrar valor no lado correto
       const vlComp = sr.debito || sr.credito;
-      html += `<tr style="background:#fffbf0;border-left:4px solid #e8d88a;">
+      html += `<tr style="background:var(--saldo-bg);border-left:4px solid var(--saldo-border);">
         <td class="mo" style="font-size:10px;color:var(--text3)">${sr.data_str}</td>
         <td class="mo" style="color:var(--info);font-size:11px;font-weight:bold">${sr.nf}</td>
         <td style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" colspan="2">${sr.razao}</td>
@@ -3433,8 +3490,8 @@ function renderTribut(){
   const isKeyRow=lbl=>/final|a pagar|valor\s*final|devid|valor\s*devido/i.test(lbl);
   document.getElementById('trib-tbody').innerHTML=tributData.map(it=>{
     const v=it.valores[mes];
-    const st=it.isHeader?'background:var(--bg2);font-weight:bold;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);':
-              isKeyRow(it.label)?'background:#e8f5e9;font-weight:bold;':'';
+    const st=it.isHeader?'background:var(--surface2);font-weight:bold;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);':
+              isKeyRow(it.label)?'background:var(--key-row-bg);font-weight:bold;':'';
     return '<tr style="'+st+'">'+
       '<td style="font-size:11px;color:var(--text2);">'+(it.conta||'')+'</td>'+
       '<td>'+(it.isHeader?'<strong>'+it.label+'</strong>':it.label)+'</td>'+
@@ -3702,7 +3759,7 @@ function loteAplicar(){
 <style id="lote-css">
 .lote-overlay{position:fixed;inset:0;background:rgba(26,25,22,.55);z-index:9999;display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;}
 .lote-modal{background:var(--surface);width:100%;max-width:760px;border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,.3);display:flex;flex-direction:column;max-height:88vh;font-family:var(--font);}
-.lote-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);background:#fffbf0;border-radius:8px 8px 0 0;}
+.lote-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);background:var(--saldo-bg);border-radius:8px 8px 0 0;}
 .lote-head h3{margin:0;font-size:15px;color:var(--warn);}
 .lote-head h3 span{font-size:11px;color:var(--text3);font-weight:normal;}
 .lote-x{border:none;background:none;font-size:18px;cursor:pointer;color:var(--text3);}
@@ -3711,8 +3768,8 @@ function loteAplicar(){
 .lote-busca{flex:1;min-width:160px;height:30px;padding:0 10px;border:1px solid var(--border2);border-radius:4px;font-size:12px;font-family:var(--font);}
 .lote-count{font-size:11px;color:var(--text3);white-space:nowrap;}
 .ltbtn{height:30px;padding:0 12px;border:none;border-radius:4px;font-size:12px;font-family:var(--font);cursor:pointer;color:#fff;}
-.ltbtn.imp{background:var(--info);}.ltbtn.zer{background:var(--warn);}.ltbtn.lim{background:#999;}
-.ltbtn.apply{background:var(--accent);font-weight:bold;}.ltbtn.cancel{background:#888;}
+.ltbtn.imp{background:var(--info);}.ltbtn.zer{background:var(--warn);}.ltbtn.lim{background:var(--neutral);}
+.ltbtn.apply{background:var(--accent);font-weight:bold;}.ltbtn.cancel{background:var(--neutral2);}
 .ltbtn:hover{filter:brightness(1.1);}
 .lote-map{padding:10px 18px;background:var(--surface2);border-bottom:1px solid var(--border);}
 .lmrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12px;color:var(--text2);}
@@ -3725,9 +3782,9 @@ function loteAplicar(){
 .lote-grid td.lc{font-family:var(--mono);font-weight:bold;color:var(--text);white-space:nowrap;}
 .lote-grid td.ld{color:var(--text2);}
 .lnat{font-size:10px;padding:1px 7px;border-radius:10px;font-weight:bold;}
-.lnat.np{background:#e8eeff;color:var(--info);}
-.lnat.na2{background:#e6f3ec;color:var(--accent);}
-.lote-inp{width:130px;height:28px;padding:0 8px;border:1px solid #c8a800;border-radius:4px;font-family:var(--mono);font-size:12px;text-align:right;}
+.lnat.np{background:var(--info-bg);color:var(--info);}
+.lnat.na2{background:var(--accent-bg);color:var(--accent);}
+.lote-inp{width:130px;height:28px;padding:0 8px;border:1px solid var(--saldo-input-border);border-radius:4px;font-family:var(--mono);font-size:12px;text-align:right;background:var(--surface);color:var(--text);}
 .lote-inp:focus{outline:2px solid var(--accent2);}
 .lote-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px;border-top:1px solid var(--border);background:var(--surface2);border-radius:0 0 8px 8px;flex-wrap:wrap;}
 .lote-hint{font-size:10.5px;color:var(--text3);max-width:380px;line-height:1.4;}
