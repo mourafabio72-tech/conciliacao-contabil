@@ -1794,10 +1794,18 @@ function renderResumo(){
     <div class="scard"><h3>Em Aberto</h3><div class="v danger">${open.length} itens</div><div class="sv">${fBRL(open.reduce((s,t)=>s+(t.saldo_aberto||0),0))}</div></div>
     <div class="scard"><h3>Retenções (NF vs Rec.)</h3><div class="v ret">${rets.length} ocorr.</div><div class="sv">${fBRL(rets.reduce((s,t)=>s+t.ret_val,0))} retidos</div></div>
     <div class="scard"><h3>Saldos de Abertura</h3><div class="v warn">${Object.keys(saldosAbertura).length>0?Object.keys(saldosAbertura).length+' conta(s)':'Não informado'}</div><div class="sv">${Object.keys(saldosAbertura).length>0?'ref. 31/12/2025 — '+fBRL(Object.values(saldosAbertura).reduce((s,v)=>s+v,0)):'Informe no campo acima'}</div></div>`;
-  const gm={};open.forEach(t=>{const k=(t.conta_cod||'?').substring(0,5);if(!gm[k])gm[k]={n:0,v:0};gm[k].n++;gm[k].v+=(t.saldo_aberto||0);});
-  const gl={'1.1.2':'Aplic. Financeiras','1.1.3':'A Receber','2.1.2':'Fornecedores','2.1.3':'Obrig. Trabalhistas','2.1.4':'Obrig. Tributárias','2.1.5':'Outras c/ Pagar'};
-  let h='<table style="width:100%"><thead><tr><th>Grupo de Conta</th><th>Qtd. Em Aberto</th><th>Valor em Aberto</th></tr></thead><tbody>';
-  Object.entries(gm).sort((a,b)=>b[1].v-a[1].v).forEach(([k,v])=>{h+=`<tr><td><strong>${gl[k]||k}</strong> <span class="tag">${k}</span></td><td class="mo rt">${v.n}</td><td class="mo rt warn">${fBRL(v.v)}</td></tr>`;});
+  // Agrupar pela conta COMPLETA (não mais por prefixo de 5 chars): assim, se
+  // houver uma conta filtrada (tf-conta), `open` já vem só dela e aparece uma
+  // única linha com a própria conta; se o filtro estiver em "Todas as contas",
+  // aparece uma linha por conta com item em aberto.
+  const gm={};
+  open.forEach(t=>{
+    const k=t.conta_cod||'?';
+    if(!gm[k]) gm[k]={n:0,v:0,desc:t.conta_desc||''};
+    gm[k].n++; gm[k].v+=(t.saldo_aberto||0);
+  });
+  let h='<table style="width:100%"><thead><tr><th>Conta</th><th>Qtd. Em Aberto</th><th>Valor em Aberto</th></tr></thead><tbody>';
+  Object.entries(gm).sort((a,b)=>b[1].v-a[1].v).forEach(([k,v])=>{h+=`<tr><td><strong>${v.desc||'—'}</strong> <span class="tag">${k}</span></td><td class="mo rt">${v.n}</td><td class="mo rt warn">${fBRL(v.v)}</td></tr>`;});
   document.getElementById('stbl').innerHTML=h+'</tbody></table>';
 }
 
