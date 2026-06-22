@@ -345,17 +345,6 @@ td.cred{color:#8a1a1a;}
           <label>Tipo de Conta</label>
           <select class="tf-tipo" id="tf-tipo" onchange="syncConta()">
             <option value="">Todos os tipos</option>
-            <option value="1.1.1">Caixa e Bancos (1.1.1)</option>
-            <option value="1.1.2">Aplicações Financeiras (1.1.2)</option>
-            <option value="1.1.3">A Receber (1.1.3)</option>
-            <option value="1.1.4">Outros Ativos Circ. (1.1.4)</option>
-            <option value="1.2.1">Ativo Não Circulante (1.2.1)</option>
-            <option value="2.1.2">Fornecedores (2.1.2)</option>
-            <option value="2.1.3">Obrig. Trabalhistas (2.1.3)</option>
-            <option value="2.1.4">Obrig. Tributárias (2.1.4)</option>
-            <option value="2.1.5">Outras c/ Pagar (2.1.5)</option>
-            <option value="2.2.1">Passivo Longo Prazo (2.2.1)</option>
-            <option value="2.2.4">Outros Passivos (2.2.4)</option>
           </select>
         </div>
         <div class="tfg tf-conta-wrap">
@@ -1711,10 +1700,46 @@ function popFilts(){
   const optF='<option value="">Todas</option>'+filiais.map(f=>`<option value="${f}">${f}</option>`).join('');
   document.getElementById('tf-filial').innerHTML=document.getElementById('f-filial').innerHTML=optF;
   if(dates.length){const ini=dates[0].toISOString().split('T')[0],fim=dates[dates.length-1].toISOString().split('T')[0];['tf-ini','f-ini'].forEach(id=>document.getElementById(id).value=ini);['tf-fim','f-fim'].forEach(id=>document.getElementById(id).value=fim);}
+  popularTiposConta();
   // Novo conjunto de dados → volta para "todas as contas" no filtro multi-seleção.
   _contasFiltro=null;
   updateContaBtnLabel();
   renderContaCheckboxes();
+}
+
+// ── TIPO DE CONTA — gerado a partir do plano de contas REALMENTE carregado ──
+// (antes era uma lista fixa de prefixos pensada para um único cliente/plano
+// de contas; numa empresa com numeração diferente — ex.: "2.1.0" em vez de
+// "2.1.5" — nenhuma opção batia e o filtro sempre voltava vazio).
+// Rótulos amigáveis conhecidos (retrocompatibilidade visual); qualquer outro
+// prefixo aparece com a descrição da primeira conta encontrada daquele grupo.
+const TIPO_LABEL = {
+  '1.1.1':'Caixa e Bancos','1.1.2':'Aplicações Financeiras','1.1.3':'A Receber',
+  '1.1.4':'Outros Ativos Circ.','1.2.1':'Ativo Não Circulante','2.1.2':'Fornecedores',
+  '2.1.3':'Obrig. Trabalhistas','2.1.4':'Obrig. Tributárias','2.1.5':'Outras c/ Pagar',
+  '2.2.1':'Passivo Longo Prazo','2.2.4':'Outros Passivos'
+};
+function tiposDisponiveis(){
+  const set=new Set();
+  allData.forEach(t=>{
+    if(!t.conta_cod) return;
+    const seg=t.conta_cod.split('.');
+    if(seg.length>=3) set.add(seg.slice(0,3).join('.'));
+  });
+  return [...set].sort();
+}
+function popularTiposConta(){
+  const sel=document.getElementById('tf-tipo');
+  if(!sel) return;
+  const atual=sel.value;
+  const tipos=tiposDisponiveis();
+  sel.innerHTML='<option value="">Todos os tipos</option>'+tipos.map(p=>{
+    const t=allData.find(x=>x.conta_cod && x.conta_cod.startsWith(p));
+    const lbl=TIPO_LABEL[p] || (t?t.conta_desc:'') || p;
+    return `<option value="${p}">${lbl} (${p})</option>`;
+  }).join('');
+  // Mantém a seleção atual se ainda existir na nova lista; senão volta a "Todos".
+  sel.value = tipos.includes(atual) ? atual : '';
 }
 
 // ── CONTA CONTÁBIL — dropdown multi-seleção (checkboxes) ──────────────────
