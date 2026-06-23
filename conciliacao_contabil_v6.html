@@ -2229,8 +2229,10 @@ function renderRet(){
   // Filtrar retenções apenas das contas/período presentes no filtData atual
   const contasVisiveis = new Set(filtData.map(t=>t.conta_cod).filter(Boolean));
   const datasVisiveis  = filtData.map(t=>t.data).filter(Boolean);
-  const dtMin = datasVisiveis.length ? new Date(Math.min(...datasVisiveis)) : null;
-  const dtMax = datasVisiveis.length ? new Date(Math.max(...datasVisiveis)) : null;
+  // Usar reduce (não Math.min/max com spread) — com muitos lançamentos o
+  // spread excede o limite de argumentos do motor JS e estoura a pilha.
+  const dtMin = datasVisiveis.length ? datasVisiveis.reduce((a,b)=>a<b?a:b) : null;
+  const dtMax = datasVisiveis.length ? datasVisiveis.reduce((a,b)=>a>b?a:b) : null;
 
   const rp = pares.filter(p =>
     p.tipo === 'ret' &&
