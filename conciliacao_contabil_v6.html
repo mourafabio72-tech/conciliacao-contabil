@@ -2677,7 +2677,9 @@ function renderResultado(){
     return '<span class="sb sb-na">—</span>';
   };
 
-  tb.innerHTML = rows.map(r => `<tr class="r-open">
+  // Limitar a tabela (igual às demais abas) — os cards de totais acima já
+  // usam `rows` por completo, só a listagem é cortada para não pesar o DOM.
+  tb.innerHTML = rows.slice(0,1000).map(r => `<tr class="r-open">
     <td class="mo">${fDate(r.data)}</td>
     <td class="mo" style="font-weight:bold;color:var(--info)">${r.nf}</td>
     <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px">${r.razao}</td>
@@ -2688,6 +2690,7 @@ function renderResultado(){
     <td>${sbadge(r.status)}</td>
     <td style="font-size:10px;color:var(--text3)">${r.obs}</td>
   </tr>`).join('');
+  if(rows.length>1000) tb.innerHTML+=`<tr><td colspan="9" style="text-align:center;font-size:11px;color:var(--text3);padding:.5rem">Exibindo 1000 de ${rows.length}. Use filtros para refinar.</td></tr>`;
 }
 
 function scRes(col){
@@ -2788,7 +2791,10 @@ function renderDiverg(){
     return;
   }
 
-  tb.innerHTML = items.map(t=>`<tr class="${t.credito>0?'r-ant':'r-open'}">
+  // Limitar como nas demais abas — sem isso, um razão grande com muitos
+  // lançamentos sem NF reconhecida gera uma tabela enorme de uma vez só e
+  // deixa a página pesada/sem resposta (sem chegar a dar erro).
+  tb.innerHTML = items.slice(0,1000).map(t=>`<tr class="${t.credito>0?'r-ant':'r-open'}">
     <td class="mo">${fDate(t.data)}</td>
     <td class="mo" style="font-weight:bold;color:var(--info)">${t.nf||'—'}</td>
     <td class="rcell">${t.razao_social||'—'}</td>
@@ -2799,6 +2805,7 @@ function renderDiverg(){
     <td><span class="sb ${t.credito>0?'sb-ant':'sb-partial'}" style="white-space:nowrap">${t._divtipo}</span></td>
     <td style="font-size:10px;color:var(--text2)">${t._divsit}</td>
   </tr>`).join('');
+  if(items.length>1000) tb.innerHTML+=`<tr><td colspan="9" style="text-align:center;font-size:11px;color:var(--text3);padding:.5rem">Exibindo 1000 de ${items.length}. Use filtros para refinar.</td></tr>`;
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -3098,7 +3105,7 @@ function renderValidFin() {
     diverg:   '<span class="sb sb-diverg">✗ Divergente</span>',
   };
 
-  tb.innerHTML = rows.map(r => `<tr class="${r.rowClass}">
+  tb.innerHTML = rows.slice(0,1000).map(r => `<tr class="${r.rowClass}">
     <td class="mo" style="font-weight:bold;color:var(--info)">${r.nf}</td>
     <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px">${r.nome}</td>
     <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:var(--text3);font-family:var(--mono)">${r.contas||'—'}</td>
@@ -3112,6 +3119,7 @@ function renderValidFin() {
     <td>${sbMap[r.situacao]||''}</td>
     <td style="font-size:10px;color:var(--text3);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||''}</td>
   </tr>`).join('');
+  if(rows.length>1000) tb.innerHTML+=`<tr><td colspan="12" style="text-align:center;font-size:11px;color:var(--text3);padding:.5rem">Exibindo 1000 de ${rows.length}. Use os filtros para refinar.</td></tr>`;
 }
 
 function expValidFin() {
