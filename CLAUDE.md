@@ -86,9 +86,20 @@ fixtures em JSON puro, sem precisar do SheetJS no Node.
 
 - Match de NF: por **número exato**, nunca por valor.
 - Retenção: quando a diferença entre NF e recibo fica entre **0,1% e 35%**.
+- Compensação por soma (pagamento/recebimento unificado): para lançamentos
+  **sem NF**, antes da compensação genérica 1x1, busca se um grupo de 2 a 5
+  lançamentos do lado oposto soma exatamente (tolerância R$0,02) um único
+  lançamento — ex.: 1 pagamento que liquida 3 títulos, ou 3 recebimentos
+  parciais que batem com 1 NF. Resultado vira `status='unif'` ("Comp.
+  Unificada") e **nunca fecha automático**: fica para revisão manual do
+  contador na aba Divergências, pois soma coincidente entre lançamentos não
+  relacionados é um risco real de falso positivo. Limites de segurança:
+  pool ≤ 30 itens por lado, orçamento de busca de 20.000 nós (evita travar
+  com contas muito fragmentadas) — ver `buscarGrupoSoma`/
+  `buscarCompensacaoUnificada` em `classifyAll()`.
 - Contas de controle (prefixos): `1.1.2 / 1.1.3 / 1.1.4 / 1.1.5 / 1.2.x / 2.1.x / 2.2.x`
 - Estado: `allData` (todos os lançamentos) e `filtData` (após filtros). `classifyAll()`
-  faz match / retenção / em aberto.
+  faz match / retenção / compensação unificada / em aberto.
 
 ## Abas
 

@@ -3,7 +3,10 @@
     "allow": [
       "Bash(Get-Item \"c:\\\\CLAUDE_FABIO\\\\SOLUÇÕES\\\\conciliacao-contabil-starter\\\\conciliacao_contabil_v6.html\")",
       "Bash(Select-Object Name, Length)",
-      "PowerShell(Get-Item \"c:\\\\CLAUDE_FABIO\\\\SOLUÇÕES\\\\conciliacao-contabil-starter\\\\conciliacao_contabil_v6.html\" | Select-Object Name, @{N='KB';E={[math]::Round\\($_.Length/1KB,0\\)}})"
+      "PowerShell(Get-Item \"c:\\\\CLAUDE_FABIO\\\\SOLUÇÕES\\\\conciliacao-contabil-starter\\\\conciliacao_contabil_v6.html\" | Select-Object Name, @{N='KB';E={[math]::Round\\($_.Length/1KB,0\\)}})",
+      "WebFetch(domain:mourafabio72-tech.github.io)",
+      "PowerShell(gh api repos/mourafabio72-tech/conciliacao-contabil/pages 2>&1)",
+      "WebFetch(domain:github.com)"
     ],
     "additionalDirectories": [
       "c:\\CLAUDE_FABIO\\SOLU��ES\\conciliacao-contabil-starter"

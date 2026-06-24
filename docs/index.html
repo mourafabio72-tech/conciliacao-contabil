@@ -124,6 +124,7 @@ select:focus,input:focus{border-color:var(--accent2);box-shadow:0 0 0 2px rgba(4
 .d-match{background:var(--accent2);}
 .d-ret{background:var(--ret);}
 .d-ant{background:var(--info);}
+.d-unif{background:#7a4a00;}
 .srch{width:175px;padding:4px 8px;border:1px solid var(--border2);border-radius:4px;font-size:12px;font-family:var(--font);}
 .exp{display:flex;gap:5px;margin-left:auto;}
 .bsm{padding:4px 9px;font-size:11px;border:1px solid var(--border2);border-radius:4px;background:var(--surface);cursor:pointer;color:var(--text2);font-family:var(--font);transition:background .1s;white-space:nowrap;}
@@ -145,6 +146,9 @@ tbody tr.r-open td:first-child{border-left:3px solid #d85a30;}
 tbody tr.r-match td:first-child{border-left:3px solid var(--accent2);}
 tbody tr.r-ret td:first-child{border-left:3px solid var(--ret);}
 tbody tr.r-ant td:first-child{border-left:3px solid var(--info);}
+tbody tr.r-unif{background:#fffaf0;}
+tbody tr.r-unif:hover{background:#fff3cd;}
+tbody tr.r-unif td:first-child{border-left:3px dashed #7a4a00;}
 td{padding:6px 9px;vertical-align:middle;}
 td.mo{font-family:var(--mono);font-size:11px;}
 td.rt{text-align:right;}
@@ -162,6 +166,7 @@ td.cred{color:#8a1a1a;}
 .sb-ret{background:var(--ret-bg);color:var(--ret);}
 .sb-ant{background:var(--info-bg);color:var(--info);}
 .sb-na{background:var(--border);color:var(--text3);}
+.sb-unif{background:#fff3cd;color:#7a4a00;border:1px dashed #c47a00;font-weight:bold;}
 
 /* SUMMARY */
 .sgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:11px;margin-bottom:1.4rem;}
@@ -271,6 +276,7 @@ td.cred{color:#8a1a1a;}
         <div><span class="dot d-match"></span> Match NF = Recebimento</div>
         <div><span class="dot d-ret"></span> Retenção de imposto</div>
         <div><span class="dot d-ant"></span> Comp. saldo anterior</div>
+        <div><span class="dot d-unif"></span> Comp. unificada (revisar)</div>
       </div>
     </div>
 
@@ -379,6 +385,7 @@ td.cred{color:#8a1a1a;}
         <span class="chip match-c" id="chip-match" onclick="setSF('match')"><span class="dot d-match"></span> Match</span>
         <span class="chip ret-c" id="chip-ret" onclick="setSF('ret')"><span class="dot d-ret"></span> Retenção</span>
         <span class="chip" id="chip-anterior" onclick="setSF('anterior')"><span class="dot d-ant"></span> Saldo ant.</span>
+        <span class="chip" id="chip-unif" onclick="setSF('unif')"><span class="dot d-unif"></span> Comp. Unificada</span>
         <input class="srch" type="text" id="srch" placeholder="Buscar NF, cliente, conta..." oninput="doSearch()">
         <div class="exp">
           <button class="bsm" onclick="expCSV()">CSV</button>
@@ -495,8 +502,8 @@ td.cred{color:#8a1a1a;}
       <!-- DIVERGÊNCIAS -->
       <div class="ca" id="panel-diverg" style="display:none">
         <div style="background:var(--danger-bg);border:1px solid #e8a8a8;border-radius:6px;padding:.9rem;margin-bottom:1rem;">
-          <div style="font-size:13px;font-weight:bold;color:var(--danger);margin-bottom:4px">⚠ Lançamentos sem contrapartida identificada</div>
-          <div style="font-size:11px;color:var(--text2)">Créditos com recebimento mas sem NF de débito no período — provavelmente referentes ao saldo anterior não carregado na composição. Débitos sem recebimento correspondente aparecem na aba Em Aberto.</div>
+          <div style="font-size:13px;font-weight:bold;color:var(--danger);margin-bottom:4px">⚠ Lançamentos sem contrapartida identificada ou pendentes de revisão</div>
+          <div style="font-size:11px;color:var(--text2)">Créditos com recebimento mas sem NF de débito no período — provavelmente referentes ao saldo anterior não carregado na composição. Débitos sem recebimento correspondente aparecem na aba Em Aberto. <strong>Comp. Unificada</strong>: o sistema encontrou um grupo de lançamentos cuja soma bate com um único lançamento do lado oposto (pagamento/recebimento unificado) — confirme manualmente antes de considerar conciliado, pois soma coincidente entre itens não relacionados é possível.</div>
         </div>
         <div style="display:flex;gap:10px;margin-bottom:1rem;flex-wrap:wrap;" id="diverg-metrics"></div>
         <div class="tw">
@@ -909,6 +916,98 @@ function processWS(ws){
 const OPFX=['1.1.2','1.1.3','1.1.4','1.1.5','1.2.1','1.2.3','1.2.5','2.1.2','2.1.3','2.1.4','2.1.5','2.1.6','2.2.1','2.2.2','2.2.4','2.2.6'];
 const isOA=cod=>cod&&OPFX.some(p=>cod.startsWith(p));
 
+// ── COMPENSAÇÃO POR SOMA (pagamento/recebimento unificado) ─────────────────
+// Um único lançamento pode, na prática, corresponder à SOMA de vários
+// lançamentos do lado oposto (ex.: 1 pagamento que liquida 3 títulos juntos,
+// ou 3 recebimentos parciais que somados batem com 1 NF). Busca esses grupos
+// (tamanho 2..SOMA_MAX_GRUPO) ANTES da compensação genérica 1x1, para não
+// deixar a divisão proporcional "fatiar" valor de itens que na verdade
+// formam um grupo exato. NÃO fecha automaticamente como conciliado: marca
+// status 'unif' para o contador revisar (soma coincidente entre itens não
+// relacionados é um risco real de falso positivo) — aparece na aba
+// Divergências como "Comp. Unificada".
+const SOMA_TOL       = 0.02;  // mesma tolerância do match exato 1x1
+const SOMA_MAX_GRUPO = 5;     // tamanho máximo do grupo somado (2..5 itens)
+const SOMA_MAX_POOL  = 30;    // acima disso, custo combinatório não compensa — pula
+const SOMA_MAX_NODES = 20000; // orçamento de nós de busca por chamada — garante
+                               // tempo limitado mesmo no pior caso (alvo inalcançável
+                               // + valores parecidos, onde a poda por valor não ajuda)
+
+function buscarGrupoSoma(alvo, pool){
+  // pool: [{val,t}] candidatos do lado oposto, ainda não usados. Retorna um
+  // subconjunto de tamanho 2..SOMA_MAX_GRUPO cuja soma bate com `alvo`
+  // (tolerância SOMA_TOL), ou null se não achar (inclusive se o orçamento de
+  // busca esgotar antes). Usa centavos (inteiros) para não sofrer erro de
+  // ponto flutuante na comparação de soma.
+  const alvoC = Math.round(alvo*100);
+  const tolC  = Math.round(SOMA_TOL*100);
+  const cand = pool
+    .map(p=>({val:p.val,t:p.t,c:Math.round(p.val*100)}))
+    .filter(p=>p.c>0 && p.c<=alvoC+tolC)
+    .sort((a,b)=>b.c-a.c); // desc: poda mais cedo nos ramos sem chance
+  if(!cand.length || cand.length>SOMA_MAX_POOL) return null;
+
+  let achado = null, nodes = 0;
+  (function rec(i, somaC, comb){
+    if(achado || ++nodes>SOMA_MAX_NODES) return;        // achou ou orçamento esgotou
+    if(comb.length>=2 && Math.abs(somaC-alvoC)<=tolC){ achado=comb.slice(); return; }
+    if(somaC>alvoC+tolC) return;                        // poda: já passou do alvo
+    if(i>=cand.length || comb.length>=SOMA_MAX_GRUPO) return;
+    rec(i+1, somaC+cand[i].c, comb.concat(cand[i]));     // inclui item i
+    if(achado) return;
+    rec(i+1, somaC, comb);                               // não inclui item i
+  })(0, 0, []);
+
+  return achado ? achado.map(c=>({val:c.val,t:c.t})) : null;
+}
+
+function buscarCompensacaoUnificada(items){
+  const usados = new Set();
+  const abertosSemNF = lado => items.filter(t =>
+    t.status==='open' && t[lado]>0 && !t.nf && !usados.has(t)
+  );
+
+  // Direção 1: vários DÉBITOS somando 1 CRÉDITO (ex.: 1 recebimento único
+  // que na verdade liquida vários títulos cobrados de uma vez)
+  abertosSemNF('credito')
+    .sort((a,b)=>b.credito-a.credito) // alvos maiores primeiro
+    .forEach(c => {
+      if(usados.has(c)) return;
+      const pool = abertosSemNF('debito').map(d=>({val:d.debito,t:d}));
+      const grupo = buscarGrupoSoma(c.credito, pool);
+      if(!grupo) return;
+      usados.add(c);
+      const detalhe = grupo.map(g=>fBRL(g.val)).join(' + ');
+      grupo.forEach(g=>{
+        usados.add(g.t);
+        g.t.status='unif'; g.t.saldo_aberto=0;
+        g.t.match_status='Comp. unificada — '+grupo.length+' itens = '+fBRL(c.credito)+' (revisar)';
+      });
+      c.status='unif'; c.saldo_aberto=0;
+      c.match_status='Comp. unificada — recebimento único cobre '+grupo.length+' débitos ('+detalhe+') (revisar)';
+    });
+
+  // Direção 2: vários CRÉDITOS somando 1 DÉBITO (ex.: 1 pagamento único que
+  // na verdade liquida vários títulos)
+  abertosSemNF('debito')
+    .sort((a,b)=>b.debito-a.debito)
+    .forEach(d => {
+      if(usados.has(d)) return;
+      const pool = abertosSemNF('credito').map(c=>({val:c.credito,t:c}));
+      const grupo = buscarGrupoSoma(d.debito, pool);
+      if(!grupo) return;
+      usados.add(d);
+      const detalhe = grupo.map(g=>fBRL(g.val)).join(' + ');
+      grupo.forEach(g=>{
+        usados.add(g.t);
+        g.t.status='unif'; g.t.saldo_aberto=0;
+        g.t.match_status='Comp. unificada — '+grupo.length+' itens = '+fBRL(d.debito)+' (revisar)';
+      });
+      d.status='unif'; d.saldo_aberto=0;
+      d.match_status='Comp. unificada — pagamento único liquida '+grupo.length+' créditos ('+detalhe+') (revisar)';
+    });
+}
+
 // ── CLASSIFICAÇÃO ─────────────────────────────────────────────────────────
 function classifyAll(tx){
   tx.forEach(t=>{t.is_open_account=isOA(t.conta_cod);if(!t.is_open_account)t.status='na';});
@@ -967,7 +1066,12 @@ function classifyAll(tx){
       // status permanece 'open' — sem match de NF no período
     });
 
-    // 3. Compensação genérica por valor — SOMENTE para lançamentos SEM NF identificada
+    // 3. Compensação por SOMA — pagamento/recebimento unificado (ver função
+    // buscarCompensacaoUnificada acima). Marca status 'unif' para revisão.
+    buscarCompensacaoUnificada(items);
+
+    // 4. Compensação genérica por valor — SOMENTE para lançamentos SEM NF
+    // identificada e que não entraram num grupo de soma unificada (passo 3).
     // Esses são lançamentos cujo histórico não contém número de NF reconhecível.
     const debs = items.filter(t => t.status==='open' && t.debito>0  && !t.nf).map(t=>({val:t.debito,  mtc:0,t}));
     const crds = items.filter(t => t.status==='open' && t.credito>0 && !t.nf).map(t=>({val:t.credito, mtc:0,t}));
@@ -1254,7 +1358,7 @@ function renderTags(){
 // ── CHIPS DE STATUS ───────────────────────────────────────────────────────
 function setSF(f){
   statusF=f;
-  ['all','open','partial','match','ret','anterior'].forEach(x=>document.getElementById('chip-'+x).classList.toggle('active',x===f));
+  ['all','open','partial','match','ret','anterior','unif'].forEach(x=>document.getElementById('chip-'+x).classList.toggle('active',x===f));
   renderConcil();renderAbertos();renderRazao();updMetrics();
 }
 function doSearch(){renderConcil();renderAbertos();renderRazao();updMetrics();}
@@ -1267,6 +1371,7 @@ function getVD(){
   else if(statusF==='match')d=d.filter(t=>t.status==='match');
   else if(statusF==='ret')d=d.filter(t=>t.status==='ret');
   else if(statusF==='anterior')d=d.filter(t=>t.status==='anterior');
+  else if(statusF==='unif')d=d.filter(t=>t.status==='unif');
   if(q)d=d.filter(t=>(t.historico||'').toLowerCase().includes(q)||(t.conta_cod||'').toLowerCase().includes(q)||(t.nf||'').includes(q)||(t.razao_social||'').toLowerCase().includes(q));
   return d;
 }
@@ -1279,9 +1384,10 @@ function sBadge(t){
   if(t.status==='anterior')return'<span class="sb sb-ant">Saldo ant.</span>';
   if(t.status==='open')return'<span class="sb sb-open">Em aberto</span>';
   if(t.status==='partial')return'<span class="sb sb-partial">Parcial</span>';
+  if(t.status==='unif')return'<span class="sb sb-unif">Comp. Unificada</span>';
   return'<span class="sb sb-closed">Compensado</span>';
 }
-function rClass(t){if(t.status==='open'||t.status==='partial')return'r-open';if(t.status==='match')return'r-match';if(t.status==='ret')return'r-ret';if(t.status==='anterior')return'r-ant';return'';}
+function rClass(t){if(t.status==='open'||t.status==='partial')return'r-open';if(t.status==='match')return'r-match';if(t.status==='ret')return'r-ret';if(t.status==='anterior')return'r-ant';if(t.status==='unif')return'r-unif';return'';}
 
 // ── METRICS ───────────────────────────────────────────────────────────────
 function updMetrics(){
@@ -1320,12 +1426,14 @@ function renderResumo(){
   // rets: usar filtData para contar retenções do período/conta filtrada
   const rets=filtData.filter(t=>t.status==='ret'&&t.debito>0);
   const mPares=pares.filter(p=>p.tipo==='match');
+  const unifs=filtData.filter(t=>t.status==='unif');
   document.getElementById('sgrid').innerHTML=`
     <div class="scard"><h3>Débito Total</h3><div class="v success">${fBRL(tD)}</div><div class="sv">${d.filter(t=>t.debito>0).length.toLocaleString('pt-BR')} lançamentos</div></div>
     <div class="scard"><h3>Crédito Total</h3><div class="v danger">${fBRL(tC)}</div><div class="sv">${d.filter(t=>t.credito>0).length.toLocaleString('pt-BR')} lançamentos</div></div>
     <div class="scard"><h3>Match NF / Recebimento</h3><div class="v success">${mPares.length} pares</div><div class="sv">${fBRL(mPares.reduce((s,p)=>s+p.vl_nf,0))}</div></div>
     <div class="scard"><h3>Em Aberto</h3><div class="v danger">${open.length} itens</div><div class="sv">${fBRL(open.reduce((s,t)=>s+(t.saldo_aberto||0),0))}</div></div>
     <div class="scard"><h3>Retenções (NF vs Rec.)</h3><div class="v ret">${rets.length} ocorr.</div><div class="sv">${fBRL(rets.reduce((s,t)=>s+t.ret_val,0))} retidos</div></div>
+    <div class="scard"><h3>Comp. Unificada (revisar)</h3><div class="v warn" style="color:#7a4a00">${unifs.length} itens</div><div class="sv">${fBRL(unifs.reduce((s,t)=>s+(t.debito||t.credito||0),0))} — ver aba Divergências</div></div>
     <div class="scard"><h3>Saldos de Abertura</h3><div class="v warn">${Object.keys(saldosAbertura).length>0?Object.keys(saldosAbertura).length+' conta(s)':'Não informado'}</div><div class="sv">${Object.keys(saldosAbertura).length>0?'ref. 31/12/2025 — '+fBRL(Object.values(saldosAbertura).reduce((s,v)=>s+v,0)):'Informe no campo acima'}</div></div>`;
   const gm={};open.forEach(t=>{const k=(t.conta_cod||'?').substring(0,5);if(!gm[k])gm[k]={n:0,v:0};gm[k].n++;gm[k].v+=(t.saldo_aberto||0);});
   const gl={'1.1.2':'Aplic. Financeiras','1.1.3':'A Receber','2.1.2':'Fornecedores','2.1.3':'Obrig. Trabalhistas','2.1.4':'Obrig. Tributárias','2.1.5':'Outras c/ Pagar'};
@@ -2056,12 +2164,16 @@ function getDivergencias(){
       items.push({...t, _divtipo:'Créd. s/ NF período', _divsit:'Possível saldo anterior não classificado'});
     }
     // Crédito sem NF identificada (histórico não reconhecido)
-    if(t.credito>0 && !t.nf && t.status!=='anterior'){
+    if(t.credito>0 && !t.nf && t.status!=='anterior' && t.status!=='unif'){
       items.push({...t, _divtipo:'Créd. s/ NF', _divsit:'Histórico sem número de NF reconhecido'});
     }
     // Débito sem crédito e sem estar marcado como em aberto (status closed/na mas deveria estar aberto)
     if(t.debito>0 && t.nf && !nfsComCredito.has(t.nf) && t.status==='closed'){
       items.push({...t, _divtipo:'Déb. closed s/ rec.', _divsit:'Marcado como compensado mas sem crédito identificado'});
+    }
+    // Compensação unificada (soma de vários lançamentos) — sempre exige revisão manual
+    if(t.status==='unif'){
+      items.push({...t, _divtipo:'Comp. Unificada', _divsit:t.match_status||'Soma de múltiplos lançamentos — confirmar manualmente'});
     }
   });
 
@@ -2075,8 +2187,10 @@ function renderDiverg(){
 
   const credSemNF = items.filter(i=>i._divtipo.startsWith('Créd'));
   const debClosed = items.filter(i=>i._divtipo.startsWith('Déb'));
+  const compUnif  = items.filter(i=>i._divtipo==='Comp. Unificada');
   const vlCredSem = credSemNF.reduce((s,t)=>s+t.credito,0);
   const vlDebClosed= debClosed.reduce((s,t)=>s+t.debito,0);
+  const vlCompUnif = compUnif.reduce((s,t)=>s+(t.debito||t.credito||0),0);
 
   const m = document.getElementById('diverg-metrics');
   if(m) m.innerHTML=[
@@ -2084,6 +2198,8 @@ function renderDiverg(){
     ['Valor créditos divergentes', fBRL(vlCredSem), 'var(--danger)'],
     ['Débitos closed s/ recebimento', debClosed.length, 'var(--warn)'],
     ['Valor débitos divergentes', fBRL(vlDebClosed), 'var(--warn)'],
+    ['Comp. Unificada (revisar)', compUnif.length, '#7a4a00'],
+    ['Valor Comp. Unificada', fBRL(vlCompUnif), '#7a4a00'],
   ].map(([l,v,cor])=>`<div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:.6rem 1rem;min-width:160px;">
     <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3)">${l}</div>
     <div style="font-size:17px;font-family:var(--mono);color:${cor}">${v}</div>
@@ -2094,7 +2210,10 @@ function renderDiverg(){
     return;
   }
 
-  tb.innerHTML = items.map(t=>`<tr class="${t.credito>0?'r-ant':'r-open'}">
+  const divRowCls = t => t._divtipo==='Comp. Unificada' ? 'r-unif' : (t.credito>0?'r-ant':'r-open');
+  const divBadgeCls = t => t._divtipo==='Comp. Unificada' ? 'sb-unif' : (t.credito>0?'sb-ant':'sb-partial');
+
+  tb.innerHTML = items.map(t=>`<tr class="${divRowCls(t)}">
     <td class="mo">${fDate(t.data)}</td>
     <td class="mo" style="font-weight:bold;color:var(--info)">${t.nf||'—'}</td>
     <td class="rcell">${t.razao_social||'—'}</td>
@@ -2102,7 +2221,7 @@ function renderDiverg(){
     <td class="hcell">${t.historico}</td>
     <td class="rt mo deb">${t.debito>0?fBRL(t.debito):'—'}</td>
     <td class="rt mo cred">${t.credito>0?fBRL(t.credito):'—'}</td>
-    <td><span class="sb ${t.credito>0?'sb-ant':'sb-partial'}" style="white-space:nowrap">${t._divtipo}</span></td>
+    <td><span class="sb ${divBadgeCls(t)}" style="white-space:nowrap">${t._divtipo}</span></td>
     <td style="font-size:10px;color:var(--text2)">${t._divsit}</td>
   </tr>`).join('');
 }
@@ -2242,7 +2361,7 @@ function getValidFinData() {
     // Excluir impostos retidos no histórico
     !/(IRRF|INSS|ISS\s+S|PIS\s+S|COFINS)\s+S\/NF/i.test(t.historico||'') &&
     // Excluir apenas itens totalmente compensados
-    t.status !== 'match' && t.status !== 'closed' && t.status !== 'na'
+    t.status !== 'match' && t.status !== 'closed' && t.status !== 'na' && t.status !== 'unif'
   );
 
   // Agrupar razão por NF + Conta (individual por subconta)
