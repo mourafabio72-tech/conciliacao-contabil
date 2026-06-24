@@ -1614,6 +1614,7 @@ function classifyAll(tx){
   setP(90,'Renderizando...');
   setTimeout(()=>{
     allData=tx;filtData=[...allData];
+    autoDataSaldoAnterior();
     reaplicarSaldosSalvos();
     buildUI();setP(100,'');
     document.getElementById('lst').style.display='none';
@@ -1835,6 +1836,25 @@ function syncDataSaldoAnteriorUI(){
     inp.value = m ? `${m[3]}-${m[2]}-${m[1]}` : '';
   }
   document.querySelectorAll('.data-saldo-ant-lbl').forEach(el=>el.textContent=dataSaldoAnterior);
+}
+
+// Recalcula dataSaldoAnterior como o dia ANTERIOR ao primeiro lançamento do
+// razão recém-carregado (ex.: razão começa em 01/10/2025 → saldo em
+// 30/09/2025). É a data correta por definição — o saldo de abertura é o
+// saldo no fechamento do dia anterior ao início do período carregado.
+// Chamado a cada novo arquivo carregado (classifyAll); o campo continua
+// editável depois, para o contador ajustar manualmente se precisar.
+function autoDataSaldoAnterior(){
+  const datas = allData.map(t=>t.data).filter(Boolean);
+  if(!datas.length) return;
+  const minData = datas.reduce((a,b)=>a<b?a:b);
+  const diaAnterior = new Date(minData.getFullYear(), minData.getMonth(), minData.getDate()-1);
+  const dd = String(diaAnterior.getDate()).padStart(2,'0');
+  const mm = String(diaAnterior.getMonth()+1).padStart(2,'0');
+  const yyyy = diaAnterior.getFullYear();
+  dataSaldoAnterior = `${dd}/${mm}/${yyyy}`;
+  syncDataSaldoAnteriorUI();
+  persistSaldos();
 }
 
 function remSaldo(conta){
