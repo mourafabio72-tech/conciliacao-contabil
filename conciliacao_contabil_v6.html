@@ -2567,14 +2567,24 @@ function expXLSXConciliacao(){
       });
     }
   }
+  // Itens com Match NF = Recebimento vão para uma sheet própria — já estão
+  // 100% conciliados (débito e crédito da mesma NF se cancelam), então não
+  // precisam de revisão manual e só "sujam" a sheet de Conciliação, que é
+  // onde o contador foca o que falta tratar.
+  const r1m=[['Data','NF','Razão Social','Conta','Descrição','Histórico','Débito','Crédito','Status','Observação']];
   d.forEach(t=>{
     if(hasSaldo){
         const natX = getNatureza(conta);
         saldoCor = natX==='passivo' ? saldoCor - t.debito + t.credito : saldoCor + t.debito - t.credito;
       }
+    if(t.status==='match'){
+      r1m.push([fDate(t.data),t.nf,t.razao_social,t.conta_cod,t.conta_desc,t.historico,t.debito,t.credito,t.status,t.match_status]);
+      return; // não entra na sheet de Conciliação — mas o saldo corrente acima já contabilizou o efeito real do lançamento
+    }
     r1.push([fDate(t.data),t.nf,t.razao_social,t.conta_cod,t.conta_desc,t.historico,t.debito,t.credito,hasSaldo?saldoCor:(t.saldo_aberto||0),t.status,t.match_status]);
   });
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(r1),'Conciliação');
+  if(r1m.length>1) XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(r1m),'Match NF-Rec');
   // Em Aberto — usa getItensAbertos() igual à aba da interface
   const op=getItensAbertos();
   const r2=[['Data','NF','Razão Social','Conta','Descrição','Histórico','Débito','Crédito','Saldo Aberto','Status','Observação']];
