@@ -2230,21 +2230,25 @@ function renderResumoAbertos(){
 }
 
 // ── RETENÇÕES ─────────────────────────────────────────────────────────────
-function renderRet(){
-  // Filtrar retenções apenas das contas/período presentes no filtData atual
+// Retenções visíveis no filtro atual — usada pela tela (renderRet) e pela
+// exportação da aba Retenções (mesma fonte, evita os dois ficarem diferentes).
+function getRetencoesPares(){
   const contasVisiveis = new Set(filtData.map(t=>t.conta_cod).filter(Boolean));
   const datasVisiveis  = filtData.map(t=>t.data).filter(Boolean);
   // Usar reduce (não Math.min/max com spread) — com muitos lançamentos o
   // spread excede o limite de argumentos do motor JS e estoura a pilha.
   const dtMin = datasVisiveis.length ? datasVisiveis.reduce((a,b)=>a<b?a:b) : null;
   const dtMax = datasVisiveis.length ? datasVisiveis.reduce((a,b)=>a>b?a:b) : null;
-
-  const rp = pares.filter(p =>
+  return pares.filter(p =>
     p.tipo === 'ret' &&
     contasVisiveis.has(p.conta) &&
     (!dtMin || p.data_nf >= dtMin) &&
     (!dtMax || p.data_nf <= dtMax)
   );
+}
+
+function renderRet(){
+  const rp = getRetencoesPares();
   const tb=document.getElementById('tb-ret');
   if(!rp.length){tb.innerHTML='<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--text3)">Nenhuma retenção identificada.</td></tr>';return;}
   tb.innerHTML=rp.map(p=>`<tr class="r-ret">
@@ -2281,11 +2285,30 @@ function renderRazao(){
 }
 
 // ── POR CONTA ─────────────────────────────────────────────────────────────
-function renderContas(){
+// Agregação "Por Conta" visível no filtro atual — usada pela tela
+// (renderContas) e pela exportação da aba (mesma fonte).
+function buildContasResumo(){
   const cm={};
   filtData.forEach(t=>{const k=t.conta_cod;if(!k)return;if(!cm[k])cm[k]={cod:k,desc:t.conta_desc,n:0,deb:0,cred:0,open:0,vo:0,ret:0,vr:0,is_ctrl:t.is_open_account};cm[k].n++;cm[k].deb+=t.debito;cm[k].cred+=t.credito;if(t.is_open_account&&(t.status==='open'||t.status==='partial')){cm[k].open++;cm[k].vo+=(t.saldo_aberto||0);}if(t.status==='ret'&&t.debito>0){cm[k].ret++;cm[k].vr+=t.ret_val;}});
-  const tp=cod=>{if(!cod)return'';if(cod.startsWith('1.1.2'))return'<span class="tag r">Aplicação</span>';if(cod.startsWith('1.1.3'))return'<span class="tag r">A Receber</span>';if(cod.startsWith('2.1'))return'<span class="tag p">A Pagar</span>';if(cod.startsWith('1.1.1'))return'<span class="tag">Banco</span>';return'<span class="tag">Outro</span>';};
-  document.getElementById('tb-contas').innerHTML=Object.values(cm).sort((a,b)=>b.vo-a.vo).map(c=>`<tr>
+  return Object.values(cm).sort((a,b)=>b.vo-a.vo);
+}
+function contaTipoLabel(cod){
+  if(!cod)return'';
+  if(cod.startsWith('1.1.2'))return'Aplicação';
+  if(cod.startsWith('1.1.3'))return'A Receber';
+  if(cod.startsWith('2.1'))return'A Pagar';
+  if(cod.startsWith('1.1.1'))return'Banco';
+  return'Outro';
+}
+function contaTipoBadgeClass(cod){
+  if(!cod)return'';
+  if(cod.startsWith('1.1.2')||cod.startsWith('1.1.3'))return'r';
+  if(cod.startsWith('2.1'))return'p';
+  return'';
+}
+function renderContas(){
+  const tp=cod=>{const l=contaTipoLabel(cod);if(!l)return'';const c=contaTipoBadgeClass(cod);return`<span class="tag${c?' '+c:''}">${l}</span>`;};
+  document.getElementById('tb-contas').innerHTML=buildContasResumo().map(c=>`<tr>
     <td class="mo" style="font-size:10px">${c.cod}</td><td style="font-size:11px">${c.desc}</td><td>${tp(c.cod)}</td>
     <td class="mo rt">${c.n}</td>
     <td class="mo rt deb">${fBRL(c.deb)}</td>
@@ -2300,10 +2323,12 @@ function renderContas(){
 }
 
 // ── SHOW PANEL ────────────────────────────────────────────────────────────
+let _abaAtual='resumo';
 function showP(n){
   const ps=['resumo','concil','abertos','ret','razao','contas','resultado','diverg','validfin','tribut'];
   ps.forEach(p=>{const el=document.getElementById('panel-'+p);if(el)el.style.display=p===n?'':('none');});
   document.querySelectorAll('.ptab').forEach((t,i)=>t.classList.toggle('active',ps[i]===n));
+  _abaAtual=n;
 }
 
 // ── SORT ─────────────────────────────────────────────────────────────────
@@ -2315,7 +2340,48 @@ function sc(tbl,col){
 }
 
 // ── EXPORT ────────────────────────────────────────────────────────────────
+function baixarCSV(conteudo,nome){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['﻿'+conteudo],{type:'text/csv;charset=utf-8'}));
+  a.download=nome;a.click();
+}
+
+// Exporta a aba ATUALMENTE ABERTA (_abaAtual) com as mesmas colunas que
+// aparecem na tela — antes os botões CSV/Excel do topo sempre exportavam o
+// layout de Conciliação, mesmo estando em Razão Completo/Em Aberto/etc.
 function expCSV(){
+  if(_abaAtual==='razao'){
+    const d=getVD();
+    const h='Data,Lote/Doc,Nº NF,Razão Social,Conta,Histórico,Filial,Débito,Crédito,Saldo,Status\n';
+    const r=d.map(t=>[fDate(t.data),t.lote_doc,t.nf,'"'+(t.razao_social||'')+'"',t.conta_cod,'"'+(t.historico||'').replace(/"/g,'""')+'"',t.filial||'',t.debito.toFixed(2),t.credito.toFixed(2),'"'+(t.saldo_str||'')+'"',t.status].join(',')).join('\n');
+    baixarCSV(h+r,'razao_completo.csv');
+    return;
+  }
+  if(_abaAtual==='abertos'){
+    const d=getItensAbertos();
+    const h='Data,NF/Doc,Razão Social,Conta,Histórico,Débito,Crédito,Saldo Aberto,Status\n';
+    const r=d.map(t=>[fDate(t.data),t.nf||'—','"'+(t.razao_social||'')+'"',t.conta_cod,'"'+(t.historico||'').replace(/"/g,'""')+'"',t.debito.toFixed(2),t.credito.toFixed(2),(t.saldo_aberto||t.debito||t.credito||0).toFixed(2),t.status].join(',')).join('\n');
+    baixarCSV(h+r,'em_aberto.csv');
+    return;
+  }
+  if(_abaAtual==='ret'){
+    const rp=getRetencoesPares();
+    const h='Data NF,Data Rec.,Nº NF,Razão Social,Conta,Vl. NF,Vl. Recebido,Vl. Retido,% Retenção\n';
+    const r=rp.map(p=>[fDate(p.data_nf),fDate(p.data_rec),p.nf_num,'"'+(p.razao||'')+'"',p.conta,p.vl_nf.toFixed(2),p.vl_rec.toFixed(2),p.diferenca.toFixed(2),p.pct.toFixed(2)+'%'].join(',')).join('\n');
+    baixarCSV(h+r,'retencoes.csv');
+    return;
+  }
+  if(_abaAtual==='contas'){
+    const cm=buildContasResumo();
+    const h='Código,Descrição,Tipo,Lanç.,Total Déb.,Total Créd.,Saldo Líq.,Em Aberto,Vl. Aberto,Retenções,Vl. Retido,Status\n';
+    const r=cm.map(c=>[c.cod,'"'+(c.desc||'')+'"',contaTipoLabel(c.cod),c.n,c.deb.toFixed(2),c.cred.toFixed(2),(c.deb-c.cred).toFixed(2),c.open,c.vo.toFixed(2),c.ret,c.vr.toFixed(2),c.open>0?'Pendências':(c.is_ctrl?'OK':'N/A')].join(',')).join('\n');
+    baixarCSV(h+r,'por_conta.csv');
+    return;
+  }
+  expCSVConciliacao();
+}
+
+function expCSVConciliacao(){
   const d=getVD();
   const h='Data,NF,Razão Social,Conta,Histórico,Débito,Crédito,Saldo Aberto,Status\n';
   const r=d.map(t=>[fDate(t.data),t.nf,'"'+t.razao_social+'"',t.conta_cod,'"'+t.historico.replace(/"/g,'""')+'"',t.debito.toFixed(2),t.credito.toFixed(2),(t.saldo_aberto||0).toFixed(2),t.status].join(',')).join('\n');
@@ -2323,6 +2389,48 @@ function expCSV(){
 }
 
 function expXLSX(){
+  if(_abaAtual==='razao'){
+    const d=getVD();
+    const data=[['Data','Lote/Doc','Nº NF','Razão Social','Conta','Histórico','Filial','Débito','Crédito','Saldo','Status']];
+    d.forEach(t=>data.push([fDate(t.data),t.lote_doc,t.nf,t.razao_social,t.conta_cod,t.historico,t.filial,t.debito,t.credito,t.saldo_str,t.status]));
+    const wb1=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb1,XLSX.utils.aoa_to_sheet(data),'Razão Completo');
+    XLSX.writeFile(wb1,'razao_completo.xlsx');
+    return;
+  }
+  if(_abaAtual==='abertos'){
+    const op=getItensAbertos();
+    const data=[['Data','NF/Doc','Razão Social','Conta','Histórico','Débito','Crédito','Saldo Aberto','Status']];
+    op.forEach(t=>data.push([fDate(t.data),t.nf||'—',t.razao_social||'—',t.conta_cod,t.historico,t.debito,t.credito,t.saldo_aberto||t.debito||t.credito||0,t.status]));
+    const totalAb=op.reduce((s,t)=>s+(t.saldo_aberto||t.debito||0),0);
+    data.push(['','','','','','','TOTAL',totalAb,'']);
+    const wb1=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb1,XLSX.utils.aoa_to_sheet(data),'Em Aberto');
+    XLSX.writeFile(wb1,'em_aberto.xlsx');
+    return;
+  }
+  if(_abaAtual==='ret'){
+    const rp=getRetencoesPares();
+    const data=[['Data NF','Data Rec.','Nº NF','Razão Social','Conta','Vl. NF','Vl. Recebido','Vl. Retido','% Retenção']];
+    rp.forEach(p=>data.push([fDate(p.data_nf),fDate(p.data_rec),p.nf_num,p.razao,p.conta,p.vl_nf,p.vl_rec,p.diferenca,p.pct.toFixed(2)+'%']));
+    const wb1=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb1,XLSX.utils.aoa_to_sheet(data),'Retenções');
+    XLSX.writeFile(wb1,'retencoes.xlsx');
+    return;
+  }
+  if(_abaAtual==='contas'){
+    const cm=buildContasResumo();
+    const data=[['Código','Descrição','Tipo','Lanç.','Total Déb.','Total Créd.','Saldo Líq.','Em Aberto','Vl. Aberto','Retenções','Vl. Retido','Status']];
+    cm.forEach(c=>data.push([c.cod,c.desc,contaTipoLabel(c.cod),c.n,c.deb,c.cred,c.deb-c.cred,c.open,c.vo,c.ret,c.vr,c.open>0?'Pendências':(c.is_ctrl?'OK':'N/A')]));
+    const wb1=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb1,XLSX.utils.aoa_to_sheet(data),'Por Conta');
+    XLSX.writeFile(wb1,'por_conta.xlsx');
+    return;
+  }
+  expXLSXConciliacao();
+}
+
+function expXLSXConciliacao(){
   const wb=XLSX.utils.book_new();
   // Conciliação com saldo de abertura e saldo corrente
   const d=getVD();
