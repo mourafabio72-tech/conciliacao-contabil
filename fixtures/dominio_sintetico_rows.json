@@ -1,0 +1,12 @@
+[
+  ["DATA", "Nº DOC", "HISTORICO", null, null, "NOME CONTA", null, "C/PARTIDA", "DEBITO", "CREDITO", "SALDO"],
+  ["Conta:", 123, "1.1.1.01.0001", null, null, "CAIXA GERAL", null, null, null, null, null],
+  [null, null, "SALDO ANTERIOR: 1.000,00 D", null, null, null, null, null, null, null, 1000.00],
+  ["2024-01-05", 1001, "VL.NF.000123 DE CLIENTE TESTE", null, null, null, null, "4.1.1.01.0001", 1500.00, 0, 2500.00],
+  ["2024-01-06", 1002, "VL.RECEBIDO NF 123 DE CLIENTE TESTE", null, null, null, null, "1.1.1.01.0001", 0, 1500.00, 1000.00],
+  [null, null, "SALDO FINAL: 1.000,00 D", null, null, null, null, null, null, null, 1000.00],
+  ["Conta:", 124, "2.1.1.01.0001", null, null, "FORNECEDORES NACIONAIS", null, null, null, null, null],
+  [null, null, "SALDO ANTERIOR: 500,00 C", null, null, null, null, null, null, null, -500.00],
+  ["2024-01-10", 2001, "PGTO FORNECEDOR XYZ COMERCIO", null, null, null, null, "1.1.1.01.0001", 300.00, 0, -200.00],
+  [null, null, "SALDO FINAL: 200,00 C", null, null, null, null, null, null, null, -200.00]
+]

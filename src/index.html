@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conciliação Contábil — Protheus / Domínio</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg:#f5f4f0;--surface:#fff;--surface2:#f9f8f5;--border:#e2e0d8;--border2:#ccc9be;
+  --text:#1a1916;--text2:#5a5852;--text3:#8a877e;
+  --accent:#1a5c3a;--accent2:#2d8a5a;--accent-bg:#e8f5ee;
+  --warn:#8a4a00;--warn-bg:#fef3e2;
+  --danger:#8a1a1a;--danger-bg:#fde8e8;
+  --info:#1a3a8a;--info-bg:#e8eefe;
+  --ret:#6b3fa0;--ret-bg:#f0eafa;
+  --font:'Trebuchet MS',Trebuchet,Arial,sans-serif;--mono:'Courier New',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.6;}
+header{background:var(--accent);color:white;padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:56px;border-bottom:3px solid #0f3d27;}
+header h1{font-size:15px;font-weight:normal;letter-spacing:.08em;text-transform:uppercase;}
+header .ver{font-size:11px;opacity:.6;letter-spacing:.04em;}
+.sys-sel-bar{background:#0f3d27;border-bottom:2px solid #07261a;padding:7px 2rem;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.sys-sel-bar label{font-size:11px;color:rgba(255,255,255,.6);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;}
+.sys-btn{padding:5px 14px;border:1px solid rgba(255,255,255,.25);border-radius:4px;background:transparent;color:rgba(255,255,255,.6);font-size:11px;font-family:var(--font);cursor:pointer;letter-spacing:.04em;transition:all .15s;white-space:nowrap;}
+.sys-btn:hover{border-color:rgba(255,255,255,.5);color:#fff;}
+.sys-btn.active{background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.6);font-weight:bold;}
+.sys-badge{font-size:10px;padding:2px 8px;border-radius:3px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.5);font-family:var(--mono);margin-left:8px;}
+
+.layout{display:flex;height:calc(100vh - 56px);overflow:hidden;}
+
+.sidebar{width:272px;min-width:272px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.ss{padding:.9rem;border-bottom:1px solid var(--border);}
+.slbl{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:.5rem;}
+.upload-zone{border:1.5px dashed var(--border2);border-radius:6px;padding:1.1rem;text-align:center;cursor:pointer;background:var(--surface2);transition:border-color .2s,background .2s;}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent2);background:var(--accent-bg);}
+.upload-zone .icon{font-size:20px;margin-bottom:5px;display:block;}
+.upload-zone p{font-size:12px;color:var(--text2);}
+.upload-zone strong{color:var(--accent);}
+#file-input{display:none;}
+.fg{margin-bottom:.65rem;}
+.fg label{display:block;font-size:11px;color:var(--text2);margin-bottom:3px;}
+select,input[type=text],input[type=date],input[type=number]{width:100%;padding:5px 7px;border:1px solid var(--border2);border-radius:4px;background:var(--surface);color:var(--text);font-family:var(--font);font-size:12px;outline:none;}
+select:focus,input:focus{border-color:var(--accent2);box-shadow:0 0 0 2px rgba(45,138,90,.15);}
+.btn{display:block;width:100%;padding:7px 12px;background:var(--accent);color:white;border:none;border-radius:4px;font-family:var(--font);font-size:12px;letter-spacing:.05em;cursor:pointer;text-transform:uppercase;transition:background .15s;margin-top:5px;}
+.btn:hover{background:#0f3d27;}
+.btn-o{background:transparent;border:1px solid var(--accent);color:var(--accent);}
+.btn-o:hover{background:var(--accent-bg);}
+.acc-list{flex:1;overflow-y:auto;padding:.4rem 0;}
+.acc-item{padding:7px .9rem;cursor:pointer;border-left:3px solid transparent;transition:background .1s;font-size:12px;}
+.acc-item:hover{background:var(--surface2);}
+.acc-item.active{border-left-color:var(--accent);background:var(--accent-bg);}
+.acc-code{font-family:var(--mono);font-size:10px;color:var(--text3);display:block;}
+.acc-name{color:var(--text);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.acc-bdg{display:inline-block;font-size:10px;padding:1px 5px;border-radius:3px;margin-top:2px;}
+.bdg-open{background:var(--danger-bg);color:var(--danger);}
+.bdg-ok{background:var(--accent-bg);color:var(--accent);}
+
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+
+/* TOP FILTER BAR */
+.tfbar{background:var(--surface);border-bottom:2px solid var(--accent);padding:9px 1.4rem;display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;flex-shrink:0;}
+.tfg{display:flex;flex-direction:column;gap:3px;}
+.tfg label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);}
+.tfg select,.tfg input{height:33px;font-size:12px;padding:0 7px;}
+.tf-conta{min-width:250px;max-width:320px;}
+.tf-tipo{min-width:185px;}
+.tf-date{width:132px;}
+.tf-filial{width:85px;}
+.tf-sep{font-size:12px;color:var(--text3);padding-bottom:7px;}
+.tf-btns{display:flex;gap:6px;align-items:flex-end;margin-left:auto;}
+.tfbtn{height:33px;padding:0 14px;border:none;border-radius:4px;font-size:12px;font-family:var(--font);cursor:pointer;white-space:nowrap;transition:background .15s;}
+.tfbtn.apply{background:var(--accent);color:white;}
+.tfbtn.apply:hover{background:#0f3d27;}
+.tfbtn.clear{background:var(--surface2);color:var(--text2);border:1px solid var(--border2);}
+.tfbtn.clear:hover{background:var(--border);}
+
+/* SALDO ABERTURA */
+.saldo-bar{background:#fffbf0;border-bottom:1px solid #e8d88a;padding:7px 1.4rem;display:flex;align-items:center;gap:14px;flex-wrap:wrap;flex-shrink:0;}
+.saldo-bar label{font-size:11px;color:var(--warn);white-space:nowrap;font-weight:bold;}
+.saldo-bar input[type=number]{width:155px;height:29px;font-size:12px;padding:0 8px;border:1px solid #c8a800;border-radius:4px;font-family:var(--mono);}
+.saldo-bar .sbtn{height:29px;padding:0 12px;background:var(--warn);color:white;border:none;border-radius:4px;font-size:11px;font-family:var(--font);cursor:pointer;}
+.saldo-bar .sbtn:hover{background:#6a3800;}
+.saldo-badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:4px;background:var(--warn-bg);border:1px solid #e8d88a;font-size:12px;font-family:var(--mono);color:var(--warn);}
+.saldo-badge .rm{cursor:pointer;opacity:.6;margin-left:4px;font-size:13px;}
+.saldo-badge .rm:hover{opacity:1;}
+.saldo-hint{font-size:11px;color:var(--text3);}
+
+/* TAGS */
+.tags-row{display:flex;gap:6px;flex-wrap:wrap;padding:5px 1.4rem;background:var(--accent-bg);border-bottom:1px solid rgba(45,138,90,.2);min-height:32px;align-items:center;}
+.tags-row.hidden{display:none;}
+.atag{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:12px;background:var(--accent-bg);color:var(--accent);font-size:11px;border:1px solid rgba(45,138,90,.3);}
+.atag .rm{cursor:pointer;font-size:13px;line-height:1;opacity:.6;}
+.atag .rm:hover{opacity:1;}
+
+/* METRICS */
+.metrics{display:flex;padding:.65rem 1.4rem;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;gap:0;}
+.metric{flex:1;padding:0 .9rem;border-right:1px solid var(--border);}
+.metric:first-child{padding-left:0;}
+.metric:last-child{border-right:none;}
+.mlbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;display:block;}
+.mval{font-size:16px;font-family:var(--mono);display:block;margin-top:1px;}
+.mval.danger{color:var(--danger);}
+.mval.success{color:var(--accent);}
+.mval.warn{color:var(--warn);}
+.mval.ret{color:var(--ret);}
+
+/* TABS */
+.ptabs{display:flex;border-bottom:1px solid var(--border);padding:0 1.4rem;background:var(--surface);flex-shrink:0;}
+.ptab{padding:9px 14px;font-size:12px;border:none;border-bottom:2px solid transparent;background:transparent;cursor:pointer;color:var(--text2);font-family:var(--font);transition:color .1s;margin-bottom:-1px;}
+.ptab:hover{color:var(--text);}
+.ptab.active{border-bottom-color:var(--accent);color:var(--accent);}
+
+/* FILTER CHIPS */
+.frow{display:flex;gap:7px;align-items:center;padding:.45rem 1.4rem;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap;flex-shrink:0;}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border:1px solid var(--border2);border-radius:12px;font-size:11px;color:var(--text2);background:var(--surface);cursor:pointer;transition:all .1s;white-space:nowrap;}
+.chip.active{background:var(--accent);color:white;border-color:var(--accent);}
+.chip.ret-c.active{background:var(--ret);border-color:var(--ret);}
+.chip.match-c.active{background:var(--accent2);border-color:var(--accent2);}
+.dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:2px;}
+.d-open{background:var(--danger);}
+.d-partial{background:#c47a00;}
+.d-match{background:var(--accent2);}
+.d-ret{background:var(--ret);}
+.d-ant{background:var(--info);}
+.d-unif{background:#7a4a00;}
+.srch{width:175px;padding:4px 8px;border:1px solid var(--border2);border-radius:4px;font-size:12px;font-family:var(--font);}
+.exp{display:flex;gap:5px;margin-left:auto;}
+.bsm{padding:4px 9px;font-size:11px;border:1px solid var(--border2);border-radius:4px;background:var(--surface);cursor:pointer;color:var(--text2);font-family:var(--font);transition:background .1s;white-space:nowrap;}
+.bsm:hover{background:var(--surface2);}
+.bsm.pr{background:var(--accent);color:white;border-color:var(--accent);}
+.bsm.pr:hover{background:#0f3d27;}
+
+/* CONTENT */
+.ca{flex:1;overflow-y:auto;padding:1rem 1.4rem;}
+.tw{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+thead th{background:var(--surface2);padding:7px 9px;text-align:left;font-size:10px;font-weight:normal;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;}
+thead th:hover{background:var(--accent-bg);}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s;}
+tbody tr:hover{background:var(--surface2);}
+tbody tr.r-open{background:#fff8f5;}
+tbody tr.r-open:hover{background:#ffeedc;}
+tbody tr.r-open td:first-child{border-left:3px solid #d85a30;}
+tbody tr.r-match td:first-child{border-left:3px solid var(--accent2);}
+tbody tr.r-ret td:first-child{border-left:3px solid var(--ret);}
+tbody tr.r-ant td:first-child{border-left:3px solid var(--info);}
+tbody tr.r-unif{background:#fffaf0;}
+tbody tr.r-unif:hover{background:#fff3cd;}
+tbody tr.r-unif td:first-child{border-left:3px dashed #7a4a00;}
+td{padding:6px 9px;vertical-align:middle;}
+td.mo{font-family:var(--mono);font-size:11px;}
+td.rt{text-align:right;}
+td.deb{color:#1a5c3a;}
+td.cred{color:#8a1a1a;}
+.hcell{max-width:210px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;}
+.rcell{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;}
+
+/* STATUS BADGES */
+.sb{display:inline-block;padding:2px 6px;border-radius:3px;font-size:10px;letter-spacing:.03em;font-family:var(--mono);white-space:nowrap;}
+.sb-open{background:var(--danger-bg);color:var(--danger);}
+.sb-closed{background:var(--accent-bg);color:var(--accent);}
+.sb-partial{background:var(--warn-bg);color:var(--warn);}
+.sb-match{background:#e8f5ee;color:#1a5c3a;}
+.sb-ret{background:var(--ret-bg);color:var(--ret);}
+.sb-ant{background:var(--info-bg);color:var(--info);}
+.sb-na{background:var(--border);color:var(--text3);}
+.sb-unif{background:#fff3cd;color:#7a4a00;border:1px dashed #c47a00;font-weight:bold;}
+
+/* SUMMARY */
+.sgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:11px;margin-bottom:1.4rem;}
+.scard{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:.9rem;}
+.scard h3{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);margin-bottom:7px;}
+.scard .v{font-size:18px;font-family:var(--mono);margin-bottom:3px;}
+.scard .v.danger{color:var(--danger);}
+.scard .v.success{color:var(--accent);}
+.scard .v.warn{color:var(--warn);}
+.scard .v.ret{color:var(--ret);}
+.scard .sv{font-size:11px;color:var(--text3);}
+
+/* RET SECTION */
+.ret-box{background:var(--ret-bg);border:1px solid #c9a8e8;border-radius:6px;padding:.9rem;margin-bottom:1.4rem;}
+.ret-box h2{font-size:11px;color:var(--ret);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.7rem;}
+
+/* EMPTY/LOADING */
+.empty{text-align:center;padding:4rem 2rem;color:var(--text3);}
+.empty .big{font-size:3rem;margin-bottom:1rem;display:block;}
+.empty h2{font-size:16px;font-weight:normal;color:var(--text2);margin-bottom:.5rem;}
+.loading{text-align:center;padding:3rem;color:var(--text2);}
+.pbar{width:100%;height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin:12px 0;}
+.pfill{height:100%;background:var(--accent2);border-radius:2px;transition:width .3s;}
+.tag{display:inline-block;padding:1px 5px;border-radius:3px;font-size:10px;font-family:var(--mono);background:var(--info-bg);color:var(--info);margin-right:3px;}
+.tag.r{background:var(--accent-bg);color:var(--accent);}
+.tag.p{background:var(--danger-bg);color:var(--danger);}
+
+/* VALIDAÇÃO FINANCEIRO */
+.vf-upload-zone{border:1.5px dashed var(--border2);border-radius:6px;padding:1rem;text-align:center;cursor:pointer;background:var(--surface2);transition:border-color .2s,background .2s;margin-bottom:1rem;}
+.vf-upload-zone:hover,.vf-upload-zone.drag{border-color:var(--info);background:var(--info-bg);}
+.vf-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:1rem;}
+.vf-card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:.8rem;}
+.vf-card h3{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:5px;}
+.vf-card .v{font-size:17px;font-family:var(--mono);}
+.vf-card .sv{font-size:11px;color:var(--text3);}
+.r-concil td:first-child{border-left:3px solid var(--accent2);}
+.r-so-razao td:first-child{border-left:3px solid var(--warn);}
+.r-so-fin td:first-child{border-left:3px solid var(--info);}
+.r-diverg td:first-child{border-left:3px solid var(--danger);}
+.sb-concil{background:var(--accent-bg);color:var(--accent);}
+.sb-so-razao{background:var(--warn-bg);color:var(--warn);}
+.sb-so-fin{background:var(--info-bg);color:var(--info);}
+.sb-diverg{background:var(--danger-bg);color:var(--danger);}
+</style>
+</head>
+<body>
+<header>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <img src="data:image/gif;base64,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" alt="BPS4" style="height:36px;width:auto;display:block;">
+    <div style="width:1px;height:28px;background:rgba(255,255,255,0.25);"></div>
+    <h1>Conciliação Contábil</h1>
+  </div>
+  <span class="ver">Razão Analítico — MKB e Domínio · v3.0</span>
+</header>
+
+<div class="sys-sel-bar">
+  <label>Sistema contábil:</label>
+  <button class="sys-btn active" id="btn-mkb"     onclick="setSystem('mkb')">Protheus (TOTVS)</button>
+  <button class="sys-btn"        id="btn-dominio"  onclick="setSystem('dominio')">Domínio (Thomson Reuters)</button>
+  <span class="sys-badge" id="sys-badge">Protheus ativo</span>
+  <span id="sys-hint" style="margin-left:auto;font-size:10px;color:rgba(255,255,255,.4);">Mude o sistema antes de carregar o arquivo</span>
+</div>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="ss">
+      <div class="slbl">Arquivo do Razão</div>
+      <div class="upload-zone" id="uz" onclick="document.getElementById('fi').click()">
+        <span class="icon">📁</span>
+        <p id="uz-prompt"><strong>Clique para carregar</strong><br>ou arraste o .xlsx aqui</p>
+      </div>
+      <input type="file" id="fi" accept=".xlsx,.xls">
+      <div id="finfo" style="margin-top:7px;font-size:11px;color:var(--text3);"></div>
+    </div>
+
+    <div class="ss" id="fpanel" style="display:none">
+      <div class="slbl">Filtros Adicionais</div>
+      <div class="fg"><label>Tipo de conta</label>
+        <select id="f-tipo">
+          <option value="">Todas</option>
+          <option value="1.1.1">Caixa/Bancos (1.1.1)</option>
+          <option value="1.1.2">Aplicações (1.1.2)</option>
+          <option value="1.1.3">A Receber (1.1.3)</option>
+          <option value="1.1.4">Outros Ativos (1.1.4)</option>
+          <option value="1.2.1">Ativo NCirc. (1.2.1)</option>
+          <option value="2.1.2">Fornecedores (2.1.2)</option>
+          <option value="2.1.3">Obrig. Trab. (2.1.3)</option>
+          <option value="2.1.4">Obrig. Trib. (2.1.4)</option>
+          <option value="2.1.5">Outras c/ Pagar (2.1.5)</option>
+          <option value="2.2.1">Passivo LP (2.2.1)</option>
+        </select>
+      </div>
+      <div class="fg"><label>Conta específica</label><select id="f-conta"><option value="">Todas</option></select></div>
+      <div class="fg"><label>Filial</label><select id="f-filial"><option value="">Todas</option></select></div>
+      <div class="fg"><label>Período — início</label><input type="date" id="f-ini"></div>
+      <div class="fg"><label>Período — fim</label><input type="date" id="f-fim"></div>
+      <button class="btn" onclick="tfAplicar()">Aplicar filtros</button>
+      <button class="btn btn-o" onclick="tfLimpar()">Limpar</button>
+    </div>
+
+    <div class="ss" id="lpanel" style="display:none">
+      <div class="slbl">Legenda</div>
+      <div style="font-size:11px;line-height:2.1">
+        <div><span class="dot d-open"></span> Em aberto</div>
+        <div><span class="dot d-partial"></span> Parcialmente comp.</div>
+        <div><span class="dot d-match"></span> Match NF = Recebimento</div>
+        <div><span class="dot d-ret"></span> Retenção de imposto</div>
+        <div><span class="dot d-ant"></span> Comp. saldo anterior</div>
+        <div><span class="dot d-unif"></span> Comp. unificada (revisar)</div>
+      </div>
+    </div>
+
+    <div class="acc-list" id="acclist"></div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div id="est" class="empty">
+      <span class="big">📊</span>
+      <h2>Nenhum arquivo carregado</h2>
+      <p>Carregue o razão analítico (.xlsx) para iniciar.</p>
+    </div>
+    <div id="lst" class="loading" style="display:none">
+      <p>Processando razão contábil...</p>
+      <div class="pbar" style="max-width:300px;margin:12px auto;"><div class="pfill" id="pfill" style="width:0%"></div></div>
+      <p id="lmsg" style="font-size:11px;color:var(--text3);margin-top:6px;"></p>
+    </div>
+
+    <div id="app" style="display:none;flex-direction:column;height:100%;">
+
+      <!-- BARRA FILTROS -->
+      <div class="tfbar">
+        <div class="tfg">
+          <label>Tipo de Conta</label>
+          <select class="tf-tipo" id="tf-tipo" onchange="syncConta()">
+            <option value="">Todos os tipos</option>
+            <option value="1.1.1">Caixa e Bancos (1.1.1)</option>
+            <option value="1.1.2">Aplicações Financeiras (1.1.2)</option>
+            <option value="1.1.3">A Receber (1.1.3)</option>
+            <option value="1.1.4">Outros Ativos Circ. (1.1.4)</option>
+            <option value="1.2.1">Ativo Não Circulante (1.2.1)</option>
+            <option value="2.1.2">Fornecedores (2.1.2)</option>
+            <option value="2.1.3">Obrig. Trabalhistas (2.1.3)</option>
+            <option value="2.1.4">Obrig. Tributárias (2.1.4)</option>
+            <option value="2.1.5">Outras c/ Pagar (2.1.5)</option>
+            <option value="2.2.1">Passivo Longo Prazo (2.2.1)</option>
+            <option value="2.2.4">Outros Passivos (2.2.4)</option>
+          </select>
+        </div>
+        <div class="tfg">
+          <label>Conta Contábil</label>
+          <select class="tf-conta" id="tf-conta"><option value="">Todas as contas</option></select>
+        </div>
+        <div class="tfg">
+          <label>Filial</label>
+          <select class="tf-filial" id="tf-filial"><option value="">Todas</option></select>
+        </div>
+        <div class="tfg"><label>Período — de</label><input type="date" class="tf-date" id="tf-ini"></div>
+        <span class="tf-sep">→</span>
+        <div class="tfg"><label>Período — até</label><input type="date" class="tf-date" id="tf-fim"></div>
+        <div class="tf-btns">
+          <button class="tfbtn clear" onclick="tfLimpar()">Limpar</button>
+          <button class="tfbtn apply" onclick="tfAplicar()">Filtrar</button>
+        </div>
+      </div>
+
+      <!-- TAGS ATIVOS -->
+      <div class="tags-row hidden" id="tagsrow"></div>
+
+      <!-- SALDO ABERTURA -->
+      <div class="saldo-bar" id="saldo-bar">
+        <label id="saldo-nat-label">Saldo de Abertura (31/12/2025):</label>
+        <div id="saldo-conta-lbl" style="font-size:11px;color:var(--warn);font-family:var(--mono);background:#fff8e0;border:1px solid #e8d88a;border-radius:4px;padding:2px 8px;white-space:nowrap;">
+          Selecione uma conta contábil
+        </div>
+        <input type="number" id="saldo-in" step="0.01" placeholder="Ex: 886015.17" disabled style="opacity:.5">
+        <button class="sbtn" id="saldo-btn" onclick="aplicarSaldo()" disabled style="opacity:.5">Aplicar</button>
+        <div style="width:1px;height:24px;background:var(--border2);margin:0 4px;"></div>
+        <button class="sbtn" id="comp-btn" onclick="document.getElementById('comp-fi').click()" disabled style="opacity:.5;background:#6b3fa0;">📎 Composição</button>
+        <input type="file" id="comp-fi" accept=".xlsx,.xls,.csv" style="display:none" onchange="loadComposicao(this)">
+        <div id="comp-lbl" style="font-size:11px;color:var(--ret);display:none;"></div>
+        <button class="sbtn" id="comp-clear-btn" onclick="clearComposicao()" style="display:none;background:#999;font-size:10px;padding:0 8px;">✕ Composição</button>
+        <div id="saldo-bdg" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+        <span id="saldo-hint" class="saldo-hint">ℹ️ Selecione uma conta contábil no filtro acima para habilitar este campo</span>
+      </div>
+
+      <!-- TABS -->
+      <div class="ptabs">
+        <button class="ptab active" onclick="showP('resumo')">Resumo</button>
+        <button class="ptab" onclick="showP('concil')">Conciliação</button>
+        <button class="ptab" onclick="showP('abertos')">Em Aberto</button>
+        <button class="ptab" onclick="showP('ret')">Retenções</button>
+        <button class="ptab" onclick="showP('razao')">Razão Completo</button>
+        <button class="ptab" onclick="showP('contas')">Por Conta</button>
+        <button class="ptab" style="background:var(--accent);color:white;border-radius:4px 4px 0 0;font-weight:bold;" onclick="showP('resultado')">★ Resultado Final</button>
+        <button class="ptab" style="background:#8a1a1a;color:white;border-radius:4px 4px 0 0;font-weight:bold;" onclick="showP('diverg')">⚠ Divergências</button>
+        <button class="ptab" style="background:var(--info);color:white;border-radius:4px 4px 0 0;font-weight:bold;" onclick="showP('validfin')">🔗 Validação Financeiro</button>
+      </div>
+
+      <!-- METRICS -->
+      <div class="metrics">
+        <div class="metric"><span class="mlbl">Lançamentos</span><span class="mval" id="m-tot">—</span></div>
+        <div class="metric"><span class="mlbl">Match NF</span><span class="mval success" id="m-match">—</span></div>
+        <div class="metric"><span class="mlbl">Em Aberto</span><span class="mval danger" id="m-open">—</span></div>
+        <div class="metric"><span class="mlbl">Valor em Aberto</span><span class="mval warn" id="m-oval">—</span></div>
+        <div class="metric"><span class="mlbl">Retenções</span><span class="mval ret" id="m-ret">—</span></div>
+        <div class="metric"><span class="mlbl">Valor Retido</span><span class="mval ret" id="m-rval">—</span></div>
+      </div>
+
+      <!-- CHIPS + BUSCA -->
+      <div class="frow">
+        <span class="chip active" id="chip-all" onclick="setSF('all')">Todos</span>
+        <span class="chip" id="chip-open" onclick="setSF('open')"><span class="dot d-open"></span> Em aberto</span>
+        <span class="chip" id="chip-partial" onclick="setSF('partial')"><span class="dot d-partial"></span> Parciais</span>
+        <span class="chip match-c" id="chip-match" onclick="setSF('match')"><span class="dot d-match"></span> Match</span>
+        <span class="chip ret-c" id="chip-ret" onclick="setSF('ret')"><span class="dot d-ret"></span> Retenção</span>
+        <span class="chip" id="chip-anterior" onclick="setSF('anterior')"><span class="dot d-ant"></span> Saldo ant.</span>
+        <span class="chip" id="chip-unif" onclick="setSF('unif')"><span class="dot d-unif"></span> Comp. Unificada</span>
+        <input class="srch" type="text" id="srch" placeholder="Buscar NF, cliente, conta..." oninput="doSearch()">
+        <div class="exp">
+          <button class="bsm" onclick="expCSV()">CSV</button>
+          <button class="bsm pr" onclick="expXLSX()">Excel</button>
+        </div>
+      </div>
+
+      <!-- PANELS -->
+      <div class="ca" id="panel-resumo">
+        <div class="sgrid" id="sgrid"></div>
+        <div id="stbl"></div>
+      </div>
+
+      <div class="ca" id="panel-concil" style="display:none">
+        <div class="tw"><table>
+          <thead><tr>
+            <th onclick="sc('c','data')">Data</th>
+            <th>NF / Doc</th><th>Razão Social</th><th>Conta</th>
+            <th>Histórico</th>
+            <th onclick="sc('c','debito')">Débito (NF)</th>
+            <th onclick="sc('c','credito')">Crédito (Rec.)</th>
+            <th>Saldo</th><th>Status</th><th>Observação</th><th></th>
+          </tr></thead>
+          <tbody id="tb-concil"></tbody>
+        </table></div>
+      </div>
+
+      <div class="ca" id="panel-abertos" style="display:none">
+        <div class="tw"><table>
+          <thead><tr>
+            <th onclick="sc('a','data')">Data</th>
+            <th>NF / Doc</th><th>Razão Social</th><th>Conta</th>
+            <th>Histórico</th>
+            <th onclick="sc('a','debito')">Débito</th>
+            <th onclick="sc('a','credito')">Crédito</th>
+            <th>Saldo Aberto</th><th>Status</th>
+          </tr></thead>
+          <tbody id="tb-abertos"></tbody>
+        </table></div>
+      </div>
+
+      <div class="ca" id="panel-ret" style="display:none">
+        <div class="ret-box">
+          <h2>⚠ Diferença entre NF e recebimento — possível imposto retido pelo cliente</h2>
+          <div class="tw"><table>
+            <thead><tr>
+              <th>Data NF</th><th>Data Rec.</th><th>Nº NF</th><th>Razão Social</th>
+              <th>Conta</th><th>Vl. NF (Déb.)</th><th>Vl. Recebido (Créd.)</th>
+              <th>Vl. Retido</th><th>% Retenção</th>
+            </tr></thead>
+            <tbody id="tb-ret"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <div class="ca" id="panel-razao" style="display:none">
+        <div class="tw"><table>
+          <thead><tr>
+            <th onclick="sc('r','data')">Data</th><th>Lote/Doc</th>
+            <th>Nº NF</th><th>Razão Social</th><th>Conta</th>
+            <th>Histórico</th><th>Filial</th>
+            <th onclick="sc('r','debito')">Débito</th>
+            <th onclick="sc('r','credito')">Crédito</th>
+            <th>Saldo</th><th>Status</th>
+          </tr></thead>
+          <tbody id="tb-razao"></tbody>
+        </table></div>
+      </div>
+
+      <div class="ca" id="panel-contas" style="display:none">
+        <table>
+          <thead><tr>
+            <th>Código</th><th>Descrição</th><th>Tipo</th>
+            <th>Lanç.</th><th>Total Déb.</th><th>Total Créd.</th>
+            <th>Saldo Líq.</th><th>Em Aberto</th><th>Vl. Aberto</th>
+            <th>Retenções</th><th>Vl. Retido</th><th>Status</th>
+          </tr></thead>
+          <tbody id="tb-contas"></tbody>
+        </table>
+      </div>
+
+      <!-- RESULTADO FINAL -->
+      <div class="ca" id="panel-resultado" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px;">
+          <div>
+            <div style="font-size:13px;font-weight:bold;color:var(--accent)">Resultado Final da Conciliação</div>
+            <div style="font-size:11px;color:var(--text3)">Itens em aberto consolidados por NF e Razão Social, com saldo acumulado</div>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button class="bsm" onclick="expResultCSV()">CSV</button>
+            <button class="bsm pr" onclick="expResultXLSX()">Excel</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:1rem;flex-wrap:wrap;" id="res-metrics"></div>
+        <div class="tw">
+          <table id="tbl-resultado">
+            <thead><tr>
+              <th onclick="scRes('data')">Data</th>
+              <th>Nº NF</th>
+              <th>Razão Social</th>
+              <th>Conta</th>
+              <th onclick="scRes('debito')">Valor NF (Déb.)</th>
+              <th onclick="scRes('credito')">Valor Rec. (Créd.)</th>
+              <th onclick="scRes('saldo')">Saldo em Aberto</th>
+              <th>Status</th>
+              <th>Observação</th>
+            </tr></thead>
+            <tbody id="tb-resultado"></tbody>
+          </table>
+        </div>
+      </div>
+
+
+      <!-- DIVERGÊNCIAS -->
+      <div class="ca" id="panel-diverg" style="display:none">
+        <div style="background:var(--danger-bg);border:1px solid #e8a8a8;border-radius:6px;padding:.9rem;margin-bottom:1rem;">
+          <div style="font-size:13px;font-weight:bold;color:var(--danger);margin-bottom:4px">⚠ Lançamentos sem contrapartida identificada ou pendentes de revisão</div>
+          <div style="font-size:11px;color:var(--text2)">Créditos com recebimento mas sem NF de débito no período — provavelmente referentes ao saldo anterior não carregado na composição. Débitos sem recebimento correspondente aparecem na aba Em Aberto. <strong>Comp. Unificada</strong>: o sistema encontrou um grupo de lançamentos cuja soma bate com um único lançamento do lado oposto (pagamento/recebimento unificado) — confirme manualmente antes de considerar conciliado, pois soma coincidente entre itens não relacionados é possível.</div>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:1rem;flex-wrap:wrap;" id="diverg-metrics"></div>
+        <div class="tw">
+          <table>
+            <thead><tr>
+              <th>Data</th><th>Nº NF</th><th>Razão Social</th><th>Conta</th>
+              <th>Histórico</th><th>Débito</th><th>Crédito</th><th>Tipo</th><th>Situação</th>
+            </tr></thead>
+            <tbody id="tb-diverg"></tbody>
+          </table>
+        </div>
+      </div>
+
+
+      <!-- VALIDAÇÃO FINANCEIRO -->
+      <div class="ca" id="panel-validfin" style="display:none">
+
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:1rem;align-items:flex-start;">
+          <!-- Upload Contas a Receber -->
+          <div style="flex:1;min-width:220px;">
+            <div style="font-size:11px;font-weight:bold;color:var(--info);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">📥 Contas a Receber (Financeiro)</div>
+            <div class="vf-upload-zone" id="vf-rec-zone" onclick="document.getElementById('vf-rec-fi').click()">
+              <div style="font-size:18px;margin-bottom:4px">📄</div>
+              <div style="font-size:12px;color:var(--text2)"><strong>Carregar arquivo</strong><br>.xlsx ou .csv</div>
+            </div>
+            <input type="file" id="vf-rec-fi" accept=".xlsx,.xls,.csv" style="display:none" onchange="loadFinanceiro(this,'rec')">
+            <div id="vf-rec-lbl" style="font-size:11px;color:var(--accent);margin-top:4px;"></div>
+          </div>
+          <!-- Upload Contas a Pagar -->
+          <div style="flex:1;min-width:220px;">
+            <div style="font-size:11px;font-weight:bold;color:var(--danger);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">📥 Contas a Pagar (Financeiro)</div>
+            <div class="vf-upload-zone" id="vf-pag-zone" onclick="document.getElementById('vf-pag-fi').click()">
+              <div style="font-size:18px;margin-bottom:4px">📄</div>
+              <div style="font-size:12px;color:var(--text2)"><strong>Carregar arquivo</strong><br>.xlsx ou .csv</div>
+            </div>
+            <input type="file" id="vf-pag-fi" accept=".xlsx,.xls,.csv" style="display:none" onchange="loadFinanceiro(this,'pag')">
+            <div id="vf-pag-lbl" style="font-size:11px;color:var(--accent);margin-top:4px;"></div>
+          </div>
+          <!-- Filtros de validação -->
+          <div style="flex:1;min-width:180px;">
+            <div style="font-size:11px;font-weight:bold;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Filtros</div>
+            <div style="margin-bottom:8px;">
+              <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px;">Tipo</label>
+              <select id="vf-tipo" style="width:100%;font-size:12px;padding:5px 7px;border:1px solid var(--border2);border-radius:4px;">
+                <option value="all">Todos</option>
+                <option value="concil">✓ Conciliado</option>
+                <option value="so_razao">⚠ Só no Razão</option>
+                <option value="so_fin">⚠ Só no Financeiro</option>
+                <option value="diverg">✗ Valor Divergente</option>
+              </select>
+            </div>
+            <div style="margin-bottom:8px;">
+              <label style="font-size:11px;color:var(--text3);display:flex;justify-content:space-between;margin-bottom:3px;">
+                <span>Cliente / Fornecedor</span>
+                <span>
+                  <span style="cursor:pointer;color:var(--accent);font-size:10px;" onclick="vfSelecionarTodos(true)">Todos</span>
+                  &nbsp;
+                  <span style="cursor:pointer;color:var(--danger);font-size:10px;" onclick="vfSelecionarTodos(false)">Nenhum</span>
+                </span>
+              </label>
+              <input type="text" id="vf-cliente-busca" placeholder="Buscar cliente..." oninput="vfFiltrarCheckboxes()"
+                style="width:100%;font-size:11px;padding:4px 7px;border:1px solid var(--border2);border-radius:4px 4px 0 0;font-family:var(--font);box-sizing:border-box;">
+              <div id="vf-cliente-list"
+                style="max-height:150px;overflow-y:auto;border:1px solid var(--border2);border-top:none;border-radius:0 0 4px 4px;background:var(--surface);padding:2px 0;">
+                <div style="padding:8px;font-size:11px;color:var(--text3);">Carregue um arquivo financeiro</div>
+              </div>
+            </div>
+            <div style="margin-bottom:8px;">
+              <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px;">NF</label>
+              <input type="text" id="vf-nf" placeholder="Filtrar por NF..." oninput="renderValidFin()"
+                style="width:100%;font-size:12px;padding:5px 7px;border:1px solid var(--border2);border-radius:4px;font-family:var(--font);">
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px;">Módulo</label>
+              <select id="vf-modulo" style="width:100%;font-size:12px;padding:5px 7px;border:1px solid var(--border2);border-radius:4px;" onchange="renderValidFin();popularSelectClientes()">
+                <option value="rec">Contas a Receber (1.1.x)</option>
+                <option value="pag">Contas a Pagar (2.1.x)</option>
+              </select>
+            </div>
+
+            <button onclick="renderValidFin()" style="margin-top:8px;width:100%;padding:6px;background:var(--info);color:white;border:none;border-radius:4px;font-size:12px;cursor:pointer;font-family:var(--font);">Validar</button>
+          </div>
+          <div style="flex:1;min-width:180px;">
+            <div style="font-size:11px;font-weight:bold;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Exportar</div>
+            <button onclick="expValidFin()" style="width:100%;padding:6px;background:var(--accent);color:white;border:none;border-radius:4px;font-size:12px;cursor:pointer;font-family:var(--font);">Excel Completo</button>
+          </div>
+        </div>
+
+        <div class="vf-cards" id="vf-metrics"></div>
+
+        <div style="font-size:11px;color:var(--text3);margin-bottom:8px;">
+          <span style="margin-right:12px"><span class="sb sb-concil">✓ Conciliado</span> NF casou razão = financeiro</span>
+          <span style="margin-right:12px"><span class="sb sb-so-razao">⚠ Só Razão</span> contabilizado mas não no financeiro</span>
+          <span style="margin-right:12px"><span class="sb sb-so-fin">⚠ Só Financeiro</span> no financeiro mas não contabilizado</span>
+          <span><span class="sb sb-diverg">✗ Divergente</span> NF existe nos dois mas valores diferem</span>
+        </div>
+
+        <div class="tw">
+          <table>
+            <thead><tr>
+              <th>NF</th><th>Cliente / Fornecedor</th><th>Contas Contábeis</th>
+              <th>Emissão</th><th>Vencimento</th>
+              <th>Vl. Razão</th><th>Vl. Financeiro</th><th>Diferença</th>
+              <th>Dias Atraso</th><th>Status Fin.</th><th>Situação</th><th>Observação</th>
+            </tr></thead>
+            <tbody id="tb-validfin"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /app -->
+  </main>
+</div>
+
+
+<!-- @BUILD:SCRIPTS -->
+</body>
+</html>
+
