@@ -2691,15 +2691,24 @@ function loadComposicao(input) {
             return;
           }
         }
+        // ci(): busca por substring no cabeçalho, tolera acento (compara sem
+        // diacríticos) — ex.: "histórico" e "historico" batem com 'hist'.
+        const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g,'');
+        const hdrN = hdr.map(norm);
+        const ciCSV = h => hdrN.findIndex(x=>x.includes(norm(h)));
+        const iHistCSV = ciCSV('hist');
         for (let i=1;i<lines.length;i++) {
           const cols = lines[i].split(sep).map(c=>c.replace(/"/g,'').trim());
           if (!cols.join('')) continue;
           // Filtrar pela conta selecionada se arquivo tiver coluna conta
           if (iContaCSV >= 0 && cols[iContaCSV] && cols[iContaCSV] !== conta) continue;
-          const getNF  = () => cols[hdr.indexOf('nf')] || cols[hdr.indexOf('nota')] || cols[hdr.indexOf('numero')] || cols[0] || '';
-          const getRS  = () => cols[hdr.indexOf('razao')] || cols[hdr.indexOf('cliente')] || cols[hdr.indexOf('fornecedor')] || cols[1] || '';
-          const getVl  = () => parseFloat((cols[hdr.indexOf('valor')] || cols[hdr.indexOf('saldo')] || cols[2] || '0').replace(/\./g,'').replace(',','.')) || 0;
-          const getDt  = () => cols[hdr.indexOf('data')] || cols[hdr.indexOf('vencimento')] || dataSaldoAnterior;
+          const histTxt = iHistCSV >= 0 ? (cols[iHistCSV]||'') : '';
+          // Sem coluna dedicada de NF/Razão Social: extrai do histórico com as
+          // mesmas regras usadas no razão principal (exNF/exRS).
+          const getNF  = () => cols[ciCSV('nf')] || cols[ciCSV('nota')] || cols[ciCSV('numero')] || (histTxt && exNF(histTxt)) || '';
+          const getRS  = () => cols[ciCSV('razao')] || cols[ciCSV('cliente')] || cols[ciCSV('fornecedor')] || (histTxt && exRS(histTxt)) || '';
+          const getVl  = () => parseFloat((cols[ciCSV('valor')] || cols[ciCSV('saldo')] || cols[2] || '0').replace(/\./g,'').replace(',','.')) || 0;
+          const getDt  = () => cols[ciCSV('data')] || cols[ciCSV('vencimento')] || dataSaldoAnterior;
           items.push({ nf: getNF(), razao: getRS(), valor: getVl(), data_str: getDt() });
         }
       } else {
@@ -2708,10 +2717,16 @@ function loadComposicao(input) {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', cellDates:true});
         if (rows.length < 2) { alert('Planilha vazia ou sem dados.'); return; }
-        const hdr = rows[0].map(h=>String(h).toLowerCase().trim());
+        // ci(): busca por substring no cabeçalho tolerando acento (compara sem
+        // diacríticos) — ex.: "histórico"/"razão" batem com 'hist'/'razao'.
+        const normH = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
+        const hdr = rows[0].map(normH);
         const ci  = h => hdr.findIndex(x=>x.includes(h));
-        const iNF    = ci('nf')    >= 0 ? ci('nf')    : ci('nota')   >= 0 ? ci('nota')   : ci('num')     >= 0 ? ci('num')     : 0;
-        const iRS    = ci('razao') >= 0 ? ci('razao') : ci('client') >= 0 ? ci('client') : ci('fornec')   >= 0 ? ci('fornec')   : 1;
+        const iHist  = ci('hist'); // histórico/historico — texto livre com NF e nome embutidos
+        // Sem coluna dedicada de NF/Razão Social: ficam -1 e o fallback abaixo
+        // extrai do histórico com exNF/exRS (mesma regra do razão principal).
+        const iNF    = ci('nf')    >= 0 ? ci('nf')    : ci('nota')   >= 0 ? ci('nota')   : ci('num')     >= 0 ? ci('num')     : ci('documento')>=0 ? ci('documento') : -1;
+        const iRS    = ci('razao') >= 0 ? ci('razao') : ci('client') >= 0 ? ci('client') : ci('fornec')   >= 0 ? ci('fornec')   : ci('nome')>=0 ? ci('nome') : -1;
         const iVl    = ci('valor') >= 0 ? ci('valor') : ci('saldo')  >= 0 ? ci('saldo')  : ci('montante') >= 0 ? ci('montante') : 2;
         const iDt    = ci('data')  >= 0 ? ci('data')  : ci('venc')   >= 0 ? ci('venc')   : -1;
         // ── Detectar coluna de conta contábil ──
@@ -2753,7 +2768,14 @@ function loadComposicao(input) {
           // na tela em vez de "30/09/2025").
           const dtParsed = iDt >= 0 ? toDate(r[iDt]) : null;
           const dtStr = dtParsed ? dtParsed.toLocaleDateString('pt-BR') : (dataSaldoAnterior || '31/12/2025');
-          items.push({ nf: String(r[iNF]||'').trim(), razao: String(r[iRS]||'').trim(), valor: vl, data_str: dtStr });
+          const histTxt = iHist >= 0 ? String(r[iHist]!=null?r[iHist]:'').trim() : '';
+          const nfCol   = iNF >= 0 ? String(r[iNF]!=null?r[iNF]:'').trim() : '';
+          const rsCol   = iRS >= 0 ? String(r[iRS]!=null?r[iRS]:'').trim() : '';
+          items.push({
+            nf: nfCol || (histTxt ? exNF(histTxt) : ''),
+            razao: rsCol || (histTxt ? exRS(histTxt) : ''),
+            valor: vl, data_str: dtStr
+          });
         }
       }
 
