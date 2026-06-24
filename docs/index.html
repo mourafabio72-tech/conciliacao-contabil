@@ -1423,10 +1423,15 @@ function classifyAll(tx){
     // Lançamentos sem NF podem casar por valor (compensação genérica).
     // ───────────────────────────────────────────────────────────────────────
 
-    // 1. Match por NF exata: débito (VL.NF.) × crédito (VL.REC./VL.RECEBIDO)
-    // Apenas lançamentos ainda 'open' e com NF identificada
-    const nfIt = items.filter(t => t.is_nf  && t.debito>0  && t.nf && t.status==='open');
-    const rcIt = items.filter(t => t.is_rec  && t.credito>0 && t.nf && t.status==='open');
+    // 1. Match por NF exata: débito × crédito com a MESMA NF extraída.
+    // Apenas lançamentos ainda 'open' e com NF identificada — o critério é o
+    // número da NF (exNF), não as palavras-chave do histórico (is_nf/is_rec):
+    // históricos como "RPS SAIDA 000010372" (débito) ou "BX REF NF - 000010372"
+    // (crédito) não batem com nenhuma palavra-chave conhecida, mas têm a NF
+    // certinha extraída — exigir is_nf/is_rec aqui deixava esses pares
+    // presos em "Em Aberto" para sempre, mesmo com NF e valor batendo.
+    const nfIt = items.filter(t => t.debito>0  && t.nf && t.status==='open');
+    const rcIt = items.filter(t => t.credito>0 && t.nf && t.status==='open');
     const usedR = new Set();
 
     nfIt.forEach(nf => {
