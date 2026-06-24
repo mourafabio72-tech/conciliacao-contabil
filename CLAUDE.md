@@ -9,27 +9,33 @@ em aberto) e gera relatórios por aba, com exportação CSV e Excel.
 O **entregável final é UM único arquivo HTML** que o contador abre com dois
 cliques, sem instalar nada. Isso é uma decisão de produto, não um acidente.
 
-- O código-fonte é modular (`src/js/...`), mas o build SEMPRE produz um único
-  `dist/conciliacao_contabil.html` com todo o JS e CSS embutidos (inline).
 - Nenhum framework. JS puro (vanilla). SheetJS 0.18.5 via CDN (cdnjs) é a única
   dependência de runtime, carregada por `<script src>` no `<head>`.
-- Nenhuma dependência de runtime adicional. Nada de bundler pesado: o build é um
-  `node build.js` de ~40 linhas, sem dependências.
+- Nenhuma dependência de runtime adicional. Nada de bundler pesado.
 
-## Como rodar
+## Estado atual do repositório — leia antes de editar
 
-- `node build.js` (ou `npm run build`) → gera `docs/index.html` (servido pelo
-  GitHub Pages — não existe pasta `dist/`)
-- `node --test` (ou `npm test`) → roda os testes de parser
-- Abrir `docs/index.html` no navegador para validar manualmente.
+Há duas frentes paralelas e elas **ainda não convergiram**:
 
-**Antes de considerar qualquer tarefa concluída: rode `node build.js` E
-`node --test`. Os dois precisam passar.**
+1. **Monolito ativo** (`docs/index.html` + `conciliacao_contabil_v6.html`):
+   onde toda a evolução real do app está acontecendo — multiempresa +
+   histórico mensal (IndexedDB), módulo IRPJ/CSLL, tema escuro, filtro de
+   conta multi-seleção, compensação por soma ("Comp. Unificada"), etc.
+   `docs/index.html` é servido pelo GitHub Pages.
+2. **Modularização em `src/js/...`** (parsers/classify/render/app +
+   `build.js` + `tests/parsers.test.js` + `fixtures/`): foi extraída a
+   partir de uma versão **anterior e mais simples** do monolito. Hoje ela
+   **não cobre** as features citadas acima — está defasada e não é a fonte
+   usada para gerar `docs/index.html`. Existe para ser retomada numa sessão
+   dedicada a modularizar o monolito **atual** (maior), não para uso imediato.
 
-`conciliacao_contabil_v6.html`, na raiz, é a baseline histórica — não é mais
-editada diretamente (ver `PASSO_A_PASSO.md`). Todo código novo entra em `src/`.
+**Na prática, até a modularização ser refeita: edite `docs/index.html` e
+`conciliacao_contabil_v6.html` diretamente** (mesmo padrão de antes — os dois
+arquivos devem ficar idênticos). `node build.js` e `node --test` existem e
+passam, mas testam apenas os módulos de `src/js/`, que não refletem o estado
+atual do app — não os trate como cobertura do comportamento real.
 
-## Arquitetura
+## Arquitetura (alvo — pendente de retomada)
 
 ```
 src/
@@ -39,10 +45,10 @@ src/
     parsers/
       protheus.js    ← parseProtheus(rows) → { contas, lancamentos }
       dominio.js     ← parseDominio(rows)  → { contas, lancamentos }
-    classify.js      ← classifyAll(): match NF, retenção, em aberto
+    classify.js      ← classifyAll(): match NF, retenção, compensação unificada, em aberto
     render.js        ← abas, badges, exports CSV/XLSX
     app.js           ← estado global, eventos, init
-build.js             ← concatena src/js na ordem e injeta no template
+build.js             ← concatena src/js na ordem e injeta no template (gera docs/index.html)
 fixtures/            ← arquivos reais + resultado esperado (.json)
 tests/               ← *.test.js
 ```
@@ -66,6 +72,18 @@ retornam `{ contas, lancamentos }`. A leitura do workbook fica em `app.js`.
 Isso desacopla "ler Excel" de "interpretar linhas" e permite testar o parser com
 fixtures em JSON puro, sem precisar do SheetJS no Node.
 
+### Fixtures de teste — status
+
+- `fixtures/fos_protheus_rows.json` / `_esperado.json`: razão real do Protheus
+  (empresa **FOS**, conta INSS A RECUPERAR, 5663 linhas / 2961 lançamentos),
+  validado cruzando o resultado com uma reimplementação independente em
+  Python. Não é a empresa "MKB" citada no `PASSO_A_PASSO.md`, mas é o mesmo
+  layout (Protheus/TOTVS).
+- `fixtures/dominio_sintetico_rows.json` / `_esperado.json`: fixture pequena
+  escrita à mão (2 contas, 3 lançamentos) no formato exato esperado pelo
+  parser — ainda **não há arquivo real do Domínio** compatível com o layout
+  atual à disposição. Trocar por um arquivo real assim que disponível.
+
 ## Especificação dos parsers (mapeamento de colunas — frágil a mudança de formato)
 
 ### Protheus (TOTVS)
@@ -86,18 +104,6 @@ fixtures em JSON puro, sem precisar do SheetJS no Node.
   convertido (Excel/LibreOffice) antes do upload.
 - `toDate()` aceita: objeto Date, serial Excel (40000–60000) e string de data
   (necessário porque uma fixture JSON perde o tipo `Date`, virando string ISO).
-
-### Fixtures de teste — status
-
-- `fixtures/fos_protheus_rows.json` / `_esperado.json`: razão real do Protheus
-  (empresa **FOS**, conta INSS A RECUPERAR, 5663 linhas / 2961 lançamentos),
-  validado cruzando o resultado com uma reimplementação independente em
-  Python. Não é a empresa "MKB" citada no `PASSO_A_PASSO.md`, mas é o mesmo
-  layout (Protheus/TOTVS).
-- `fixtures/dominio_sintetico_rows.json` / `_esperado.json`: fixture pequena
-  escrita à mão (2 contas, 3 lançamentos) no formato exato esperado pelo
-  parser — ainda **não há arquivo real do Domínio** compatível com o layout
-  atual à disposição. Trocar por um arquivo real assim que disponível.
 
 ## Regras de classificação
 
@@ -134,9 +140,10 @@ em crédito > 180 dias (art. 340 RIR/2018).
 
 1. Mudanças pequenas e isoladas. Um commit por etapa.
 2. NUNCA introduza framework, bundler pesado ou dependência de runtime nova.
-3. Ao mexer em parser ou adicionar ERP: rode `node --test` antes de finalizar.
-4. Ao terminar qualquer alteração de UI: rode `node build.js` e confira que o
-   arquivo único ainda abre e funciona.
+3. Enquanto a modularização não for retomada: edite `docs/index.html` E
+   `conciliacao_contabil_v6.html` juntos, mantendo-os idênticos.
+4. Ao mexer nos parsers em `src/js/` (quando a modularização for retomada):
+   rode `node --test` antes de finalizar.
 5. Mantenha as specs de coluna acima atualizadas se o formato de algum ERP mudar.
 
 ## Roadmap

@@ -4,9 +4,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Conciliação Contábil — Protheus / Domínio</title>
+<script>
+// Aplica o tema salvo ANTES do CSS pintar a tela, evitando o "flash" de
+// tema claro seguido de troca para escuro quando o usuário prefere escuro.
+(function(){
+  try{
+    var t = localStorage.getItem('cc_theme');
+    if(t==='dark') document.documentElement.setAttribute('data-theme','dark');
+  }catch(e){}
+})();
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root {
+  color-scheme: light;
   --bg:#f5f4f0;--surface:#fff;--surface2:#f9f8f5;--border:#e2e0d8;--border2:#ccc9be;
   --text:#1a1916;--text2:#5a5852;--text3:#8a877e;
   --accent:#1a5c3a;--accent2:#2d8a5a;--accent-bg:#e8f5ee;
@@ -14,19 +25,59 @@
   --danger:#8a1a1a;--danger-bg:#fde8e8;
   --info:#1a3a8a;--info-bg:#e8eefe;
   --ret:#6b3fa0;--ret-bg:#f0eafa;
+  --partial:#c47a00;
+  --row-open-bg:#fff8f5;--row-open-hover:#ffeedc;--row-open-border:#d85a30;
+  --saldo-bg:#fffbf0;--saldo-border:#e8d88a;--saldo-lbl-bg:#fff8e0;--saldo-input-border:#c8a800;
+  --saldo-hdr-bg:#fff3cd;--key-row-bg:#e8f5e9;
+  --neutral:#999;--neutral2:#888;--tribut:#1a5276;--warn-hover:#6a3800;
+  --ret-border:#c9a8e8;--chip-border:#c8e6d4;--danger-border:#e8a8a8;
+  --unif:#7a4a00;--unif-bg:#fff3cd;--unif-row-bg:#fffaf0;--unif-row-hover:#fff3cd;--unif-border:#c47a00;
   --font:'Trebuchet MS',Trebuchet,Arial,sans-serif;--mono:'Courier New',monospace;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --bg:#15181c;--surface:#1d2127;--surface2:#262b32;--border:#333a44;--border2:#454c58;
+  --text:#e7e5e0;--text2:#a8aeb6;--text3:#737a83;
+  --accent:#34b079;--accent2:#46d695;--accent-bg:#163428;
+  --warn:#e0a23a;--warn-bg:#3a2c12;
+  --danger:#e2655d;--danger-bg:#3a1a18;
+  --info:#5fa0f5;--info-bg:#172943;
+  --ret:#b78cf2;--ret-bg:#2b2040;
+  --partial:#dd9b32;
+  --row-open-bg:#2c2220;--row-open-hover:#3a2a23;--row-open-border:#e07050;
+  --saldo-bg:#2a2614;--saldo-border:#5c4f22;--saldo-lbl-bg:#332b14;--saldo-input-border:#8a7320;
+  --saldo-hdr-bg:#352c12;--key-row-bg:#162a1d;
+  --neutral:#5a6168;--neutral2:#4a5158;--tribut:#5aa9d8;--warn-hover:#b9842c;
+  --ret-border:#5c3f7d;--chip-border:#2f5a44;--danger-border:#5c3230;
+  --unif:#e0a23a;--unif-bg:#352c12;--unif-row-bg:#2a2410;--unif-row-hover:#352c12;--unif-border:#8a7320;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.6;}
 header{background:var(--accent);color:white;padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:56px;border-bottom:3px solid #0f3d27;}
 header h1{font-size:15px;font-weight:normal;letter-spacing:.08em;text-transform:uppercase;}
 header .ver{font-size:11px;opacity:.6;letter-spacing:.04em;}
+.theme-toggle-btn{height:28px;padding:0 12px;border:1px solid rgba(255,255,255,.3);border-radius:14px;background:rgba(255,255,255,.1);color:#fff;font-size:11px;font-family:var(--font);cursor:pointer;white-space:nowrap;transition:background .15s;}
+.theme-toggle-btn:hover{background:rgba(255,255,255,.22);}
 .sys-sel-bar{background:#0f3d27;border-bottom:2px solid #07261a;padding:7px 2rem;display:flex;align-items:center;gap:10px;flex-shrink:0;}
 .sys-sel-bar label{font-size:11px;color:rgba(255,255,255,.6);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;}
 .sys-btn{padding:5px 14px;border:1px solid rgba(255,255,255,.25);border-radius:4px;background:transparent;color:rgba(255,255,255,.6);font-size:11px;font-family:var(--font);cursor:pointer;letter-spacing:.04em;transition:all .15s;white-space:nowrap;}
 .sys-btn:hover{border-color:rgba(255,255,255,.5);color:#fff;}
 .sys-btn.active{background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.6);font-weight:bold;}
 .sys-badge{font-size:10px;padding:2px 8px;border-radius:3px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.5);font-family:var(--mono);margin-left:8px;}
+
+/* ── EMPRESA (multiempresa) ──────────────────────────────────────────── */
+.empresa-bar{background:#143d2c;border-bottom:2px solid #07261a;padding:7px 2rem;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.empresa-bar label{font-size:11px;color:rgba(255,255,255,.6);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;}
+.empresa-bar select{width:auto;min-width:220px;max-width:340px;font-size:12px;padding:5px 8px;background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.25);}
+.empresa-bar select option{color:var(--text);background:var(--surface);}
+.empresa-bar select:focus{border-color:rgba(255,255,255,.6);box-shadow:none;}
+#empresa-info{margin-left:auto;font-size:11px;color:rgba(255,255,255,.55);white-space:nowrap;}
+.empresa-display{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:bold;background:rgba(255,255,255,.12);border-radius:4px;padding:3px 10px;margin-left:12px;letter-spacing:.02em;}
+.empresa-display:empty{display:none;}
+
+.periodo-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-family:var(--mono);background:var(--accent-bg);color:var(--accent);border:1px solid var(--chip-border);border-radius:3px;padding:2px 6px 2px 8px;}
+.periodo-chip .rm{cursor:pointer;color:var(--danger);font-weight:bold;padding:0 2px;}
+.periodo-chip .rm:hover{text-decoration:underline;}
 
 .layout{display:flex;height:calc(100vh - 56px);overflow:hidden;}
 
@@ -39,8 +90,6 @@ header .ver{font-size:11px;opacity:.6;letter-spacing:.04em;}
 .upload-zone p{font-size:12px;color:var(--text2);}
 .upload-zone strong{color:var(--accent);}
 #file-input{display:none;}
-.fg{margin-bottom:.65rem;}
-.fg label{display:block;font-size:11px;color:var(--text2);margin-bottom:3px;}
 select,input[type=text],input[type=date],input[type=number]{width:100%;padding:5px 7px;border:1px solid var(--border2);border-radius:4px;background:var(--surface);color:var(--text);font-family:var(--font);font-size:12px;outline:none;}
 select:focus,input:focus{border-color:var(--accent2);box-shadow:0 0 0 2px rgba(45,138,90,.15);}
 .btn{display:block;width:100%;padding:7px 12px;background:var(--accent);color:white;border:none;border-radius:4px;font-family:var(--font);font-size:12px;letter-spacing:.05em;cursor:pointer;text-transform:uppercase;transition:background .15s;margin-top:5px;}
@@ -68,6 +117,22 @@ select:focus,input:focus{border-color:var(--accent2);box-shadow:0 0 0 2px rgba(4
 .tf-tipo{min-width:185px;}
 .tf-date{width:132px;}
 .tf-filial{width:85px;}
+
+/* CONTA CONTÁBIL — dropdown multi-seleção (checkboxes) */
+.tf-conta-wrap{position:relative;}
+.tf-conta-btn{min-width:250px;max-width:320px;height:33px;font-size:12px;padding:0 10px;border:1px solid var(--border2);border-radius:4px;background:var(--surface);color:var(--text);font-family:var(--font);cursor:pointer;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tf-conta-btn:hover{border-color:var(--accent2);}
+.tf-conta-dropdown{display:none;position:absolute;top:100%;left:0;z-index:60;background:var(--surface);border:1px solid var(--border2);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:8px;width:340px;margin-top:4px;}
+.tf-conta-dropdown.open{display:block;}
+.tf-conta-busca{width:100%;padding:5px 8px;border:1px solid var(--border2);border-radius:4px;font-size:12px;font-family:var(--font);margin-bottom:6px;box-sizing:border-box;}
+.tf-conta-actions{display:flex;gap:6px;margin-bottom:6px;}
+.tf-conta-actions button{flex:1;padding:4px 6px;font-size:11px;border:1px solid var(--border2);border-radius:4px;background:var(--surface2);cursor:pointer;font-family:var(--font);}
+.tf-conta-actions button:hover{background:var(--border);}
+.tf-conta-list{max-height:230px;overflow-y:auto;border-top:1px solid var(--border);padding-top:4px;}
+.tf-conta-item{display:flex;align-items:center;gap:6px;padding:3px 4px;cursor:pointer;font-size:11px;border-radius:3px;}
+.tf-conta-item:hover{background:var(--surface2);}
+.tf-conta-item .cod{font-family:var(--mono);color:var(--text3);font-size:10px;white-space:nowrap;}
+.tf-conta-item .desc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .tf-sep{font-size:12px;color:var(--text3);padding-bottom:7px;}
 .tf-btns{display:flex;gap:6px;align-items:flex-end;margin-left:auto;}
 .tfbtn{height:33px;padding:0 14px;border:none;border-radius:4px;font-size:12px;font-family:var(--font);cursor:pointer;white-space:nowrap;transition:background .15s;}
@@ -77,12 +142,12 @@ select:focus,input:focus{border-color:var(--accent2);box-shadow:0 0 0 2px rgba(4
 .tfbtn.clear:hover{background:var(--border);}
 
 /* SALDO ABERTURA */
-.saldo-bar{background:#fffbf0;border-bottom:1px solid #e8d88a;padding:7px 1.4rem;display:flex;align-items:center;gap:14px;flex-wrap:wrap;flex-shrink:0;}
+.saldo-bar{background:var(--saldo-bg);border-bottom:1px solid var(--saldo-border);padding:7px 1.4rem;display:flex;align-items:center;gap:14px;flex-wrap:wrap;flex-shrink:0;}
 .saldo-bar label{font-size:11px;color:var(--warn);white-space:nowrap;font-weight:bold;}
-.saldo-bar input[type=number]{width:155px;height:29px;font-size:12px;padding:0 8px;border:1px solid #c8a800;border-radius:4px;font-family:var(--mono);}
+.saldo-bar input[type=number]{width:155px;height:29px;font-size:12px;padding:0 8px;border:1px solid var(--saldo-input-border);border-radius:4px;font-family:var(--mono);background:var(--surface);color:var(--text);}
 .saldo-bar .sbtn{height:29px;padding:0 12px;background:var(--warn);color:white;border:none;border-radius:4px;font-size:11px;font-family:var(--font);cursor:pointer;}
-.saldo-bar .sbtn:hover{background:#6a3800;}
-.saldo-badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:4px;background:var(--warn-bg);border:1px solid #e8d88a;font-size:12px;font-family:var(--mono);color:var(--warn);}
+.saldo-bar .sbtn:hover{background:var(--warn-hover);}
+.saldo-badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:4px;background:var(--warn-bg);border:1px solid var(--saldo-border);font-size:12px;font-family:var(--mono);color:var(--warn);}
 .saldo-badge .rm{cursor:pointer;opacity:.6;margin-left:4px;font-size:13px;}
 .saldo-badge .rm:hover{opacity:1;}
 .saldo-hint{font-size:11px;color:var(--text3);}
@@ -120,11 +185,11 @@ select:focus,input:focus{border-color:var(--accent2);box-shadow:0 0 0 2px rgba(4
 .chip.match-c.active{background:var(--accent2);border-color:var(--accent2);}
 .dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:2px;}
 .d-open{background:var(--danger);}
-.d-partial{background:#c47a00;}
+.d-partial{background:var(--partial);}
 .d-match{background:var(--accent2);}
 .d-ret{background:var(--ret);}
 .d-ant{background:var(--info);}
-.d-unif{background:#7a4a00;}
+.d-unif{background:var(--unif);}
 .srch{width:175px;padding:4px 8px;border:1px solid var(--border2);border-radius:4px;font-size:12px;font-family:var(--font);}
 .exp{display:flex;gap:5px;margin-left:auto;}
 .bsm{padding:4px 9px;font-size:11px;border:1px solid var(--border2);border-radius:4px;background:var(--surface);cursor:pointer;color:var(--text2);font-family:var(--font);transition:background .1s;white-space:nowrap;}
@@ -140,20 +205,20 @@ thead th{background:var(--surface2);padding:7px 9px;text-align:left;font-size:10
 thead th:hover{background:var(--accent-bg);}
 tbody tr{border-bottom:1px solid var(--border);transition:background .1s;}
 tbody tr:hover{background:var(--surface2);}
-tbody tr.r-open{background:#fff8f5;}
-tbody tr.r-open:hover{background:#ffeedc;}
-tbody tr.r-open td:first-child{border-left:3px solid #d85a30;}
+tbody tr.r-open{background:var(--row-open-bg);}
+tbody tr.r-open:hover{background:var(--row-open-hover);}
+tbody tr.r-open td:first-child{border-left:3px solid var(--row-open-border);}
 tbody tr.r-match td:first-child{border-left:3px solid var(--accent2);}
 tbody tr.r-ret td:first-child{border-left:3px solid var(--ret);}
 tbody tr.r-ant td:first-child{border-left:3px solid var(--info);}
-tbody tr.r-unif{background:#fffaf0;}
-tbody tr.r-unif:hover{background:#fff3cd;}
-tbody tr.r-unif td:first-child{border-left:3px dashed #7a4a00;}
+tbody tr.r-unif{background:var(--unif-row-bg);}
+tbody tr.r-unif:hover{background:var(--unif-row-hover);}
+tbody tr.r-unif td:first-child{border-left:3px dashed var(--unif-border);}
 td{padding:6px 9px;vertical-align:middle;}
 td.mo{font-family:var(--mono);font-size:11px;}
 td.rt{text-align:right;}
-td.deb{color:#1a5c3a;}
-td.cred{color:#8a1a1a;}
+td.deb{color:var(--accent);}
+td.cred{color:var(--danger);}
 .hcell{max-width:210px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;}
 .rcell{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;}
 
@@ -162,11 +227,11 @@ td.cred{color:#8a1a1a;}
 .sb-open{background:var(--danger-bg);color:var(--danger);}
 .sb-closed{background:var(--accent-bg);color:var(--accent);}
 .sb-partial{background:var(--warn-bg);color:var(--warn);}
-.sb-match{background:#e8f5ee;color:#1a5c3a;}
+.sb-match{background:var(--accent-bg);color:var(--accent);}
 .sb-ret{background:var(--ret-bg);color:var(--ret);}
 .sb-ant{background:var(--info-bg);color:var(--info);}
 .sb-na{background:var(--border);color:var(--text3);}
-.sb-unif{background:#fff3cd;color:#7a4a00;border:1px dashed #c47a00;font-weight:bold;}
+.sb-unif{background:var(--unif-bg);color:var(--unif);border:1px dashed var(--unif-border);font-weight:bold;}
 
 /* SUMMARY */
 .sgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:11px;margin-bottom:1.4rem;}
@@ -180,7 +245,7 @@ td.cred{color:#8a1a1a;}
 .scard .sv{font-size:11px;color:var(--text3);}
 
 /* RET SECTION */
-.ret-box{background:var(--ret-bg);border:1px solid #c9a8e8;border-radius:6px;padding:.9rem;margin-bottom:1.4rem;}
+.ret-box{background:var(--ret-bg);border:1px solid var(--ret-border);border-radius:6px;padding:.9rem;margin-bottom:1.4rem;}
 .ret-box h2{font-size:11px;color:var(--ret);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.7rem;}
 
 /* EMPTY/LOADING */
@@ -218,9 +283,24 @@ td.cred{color:#8a1a1a;}
     <img src="data:image/gif;base64,R0lGODlhPAA8APcAAP//////zP//mf//Zv//M///AP/M///MzP/Mmf/MZv/MM//MAP+Z//+ZzP+Zmf+ZZv+ZM/+ZAP9m//9mzP9mmf9mZv9mM/9mAP8z//8zzP8zmf8zZv8zM/8zAP8A//8AzP8Amf8AZv8AM/8AAMz//8z/zMz/mcz/Zsz/M8z/AMzM/8zMzMzMmczMZszMM8zMAMyZ/8yZzMyZmcyZZsyZM8yZAMxm/8xmzMxmmcxmZsxmM8xmAMwz/8wzzMwzmcwzZswzM8wzAMwA/8wAzMwAmcwAZswAM8wAAJn//5n/zJn/mZn/Zpn/M5n/AJnM/5nMzJnMmZnMZpnMM5nMAJmZ/5mZzJmZmZmZZpmZM5mZAJlm/5lmzJlmmZlmZplmM5lmAJkz/5kzzJkzmZkzZpkzM5kzAJkA/5kAzJkAmZkAZpkAM5kAAGb//2b/zGb/mWb/Zmb/M2b/AGbM/2bMzGbMmWbMZmbMM2bMAGaZ/2aZzGaZmWaZZmaZM2aZAGZm/2ZmzGZmmWZmZmZmM2ZmAGYz/2YzzGYzmWYzZmYzM2YzAGYA/2YAzGYAmWYAZmYAM2YAADP//zP/zDP/mTP/ZjP/MzP/ADPM/zPMzDPMmTPMZjPMMzPMADOZ/zOZzDOZmTOZZjOZMzOZADNm/zNmzDNmmTNmZjNmMzNmADMz/zMzzDMzmTMzZjMzMzMzADMA/zMAzDMAmTMAZjMAMzMAAAD//wD/zAD/mQD/ZgD/MwD/AADM/wDMzADMmQDMZgDMMwDMAACZ/wCZzACZmQCZZgCZMwCZAABm/wBmzABmmQBmZgBmMwBmAAAz/wAzzAAzmQAzZgAzMwAzAAAA/wAAzAAAmQAAZgAAMwAAACyhovH4+eTy88jm5w19fw5+gCaLjS2hojSlpjuoqUWsrUGam1WztGO4uX3DxJHOz6TV1i2hoS6ioS+jo2+/v7jg4Nfu7vf7+/z+/v7//vb77+Dww6nPRrLVWsTegNXnnM7hcv399/7+/PTx0fr35vG1MfO7Pv///yH5BAEAAP8ALAAAAAA8ADwAAAj/AAEIHEiwoMGDCBMqXMiwocOHECNKnEixosWLGDNq3Mixo8ePIEOKHEmypMmTKFOmzOau3ZNz7lQOzMfv3r18BMVh2xmunUp98ubZo0fUHsF1O7GJ24ZS3r579YhKpUcwXNKlJvkJncq16lWmJOdFlVrPnll7Ub3uxDpyH1d69wgOVasUbMh497jakyeX6kCra+2CxDu13r6Cc/9+JZlXalzEfgUCVurOHbpz59DFBABPm2fPljGjawevYOjM7bQNbEyvHl+aOAEklpw0XDlySdeROwfgHbnfv8WB2/lNXDmw8M6RG86TnLlt+hrXmycQAYLYswFMTsod27pz8Jh3/+cuzic6pOPVzcnX2J4+APv8IRiYffv4neDQlbvfXRy6yeGwUw5g6ETXGl8AINDPfALVR9457ZgjHjbh6LTTOuy00w476OF3VTvZZKPNeT7lRR18/ixIX2TafVjaO+d0iM03iwGQjTn8hWMXPO5kow8+9bzHTwL9qNggi5OxZSNu9ympjYXdfQNOOSAOFB11+ShYJIOyIVmjQOzwpyQA+yVFI3friHNONgLFNmQCcB4m0D1GKRYYQWE2KVie3v0m407kqCZRkjuWOd6YTGKTH4zkhNNhOuW8M+iX20DZn13bTAaOTwK5cw6U67jzzmeksimQiHSxpY2hM4qnKqvYmNmzmUDtoAfOiOPkqqsn6Axkjjh0gWNOO+gkupOASQlLrLHYlAOOf+54dg5z4NzITTfYZvvEQOWUQxd/2ATK7H3luGOhbeR0aM475mTr7rYCCTrQhPeRI6p949mbDbjiqFaOu9n2ipCi5JRjqVKy2jjZmVcl/I5+E4LDDlhPuOtNOejIa9Bo0W5DLGqzZgNgZiAXpM02l6Fm6pLeiPPENpJiJPJVs050ssYyEyqTQjPfuTNCPdf1M9Ad6jj0Qdn8Zg4626x89NNQRy311FRXbfXVWGet9dZcExQQADs=" alt="BPS4" style="height:36px;width:auto;display:block;">
     <div style="width:1px;height:28px;background:rgba(255,255,255,0.25);"></div>
     <h1>Conciliação Contábil</h1>
+    <span class="empresa-display" id="empresa-display"></span>
   </div>
-  <span class="ver">Razão Analítico — MKB e Domínio · v3.0</span>
+  <div style="display:flex;align-items:center;gap:14px;">
+    <span class="ver">Razão Analítico — MKB e Domínio · v3.0</span>
+    <button type="button" id="theme-toggle-btn" class="theme-toggle-btn" onclick="toggleTheme()" title="Alternar tema claro/escuro">🌙 Escuro</button>
+  </div>
 </header>
+
+<div class="empresa-bar">
+  <label>Empresa:</label>
+  <select id="empresa-sel" onchange="onEmpresaChange()">
+    <option value="">— Selecione ou crie uma empresa —</option>
+  </select>
+  <button class="sys-btn" onclick="novaEmpresa()">+ Nova empresa</button>
+  <button class="sys-btn" id="renomear-empresa-btn" onclick="renomearEmpresa()" style="display:none">✎ Renomear</button>
+  <button class="sys-btn" id="excluir-empresa-btn" onclick="excluirEmpresa()" style="display:none">🗑 Excluir empresa</button>
+  <span id="empresa-info"></span>
+</div>
 
 <div class="sys-sel-bar">
   <label>Sistema contábil:</label>
@@ -243,29 +323,9 @@ td.cred{color:#8a1a1a;}
       <div id="finfo" style="margin-top:7px;font-size:11px;color:var(--text3);"></div>
     </div>
 
-    <div class="ss" id="fpanel" style="display:none">
-      <div class="slbl">Filtros Adicionais</div>
-      <div class="fg"><label>Tipo de conta</label>
-        <select id="f-tipo">
-          <option value="">Todas</option>
-          <option value="1.1.1">Caixa/Bancos (1.1.1)</option>
-          <option value="1.1.2">Aplicações (1.1.2)</option>
-          <option value="1.1.3">A Receber (1.1.3)</option>
-          <option value="1.1.4">Outros Ativos (1.1.4)</option>
-          <option value="1.2.1">Ativo NCirc. (1.2.1)</option>
-          <option value="2.1.2">Fornecedores (2.1.2)</option>
-          <option value="2.1.3">Obrig. Trab. (2.1.3)</option>
-          <option value="2.1.4">Obrig. Trib. (2.1.4)</option>
-          <option value="2.1.5">Outras c/ Pagar (2.1.5)</option>
-          <option value="2.2.1">Passivo LP (2.2.1)</option>
-        </select>
-      </div>
-      <div class="fg"><label>Conta específica</label><select id="f-conta"><option value="">Todas</option></select></div>
-      <div class="fg"><label>Filial</label><select id="f-filial"><option value="">Todas</option></select></div>
-      <div class="fg"><label>Período — início</label><input type="date" id="f-ini"></div>
-      <div class="fg"><label>Período — fim</label><input type="date" id="f-fim"></div>
-      <button class="btn" onclick="tfAplicar()">Aplicar filtros</button>
-      <button class="btn btn-o" onclick="tfLimpar()">Limpar</button>
+    <div class="ss" id="periodos-panel" style="display:none">
+      <div class="slbl">Períodos carregados</div>
+      <div id="periodos-chips" style="display:flex;flex-wrap:wrap;gap:5px;"></div>
     </div>
 
     <div class="ss" id="lpanel" style="display:none">
@@ -287,8 +347,8 @@ td.cred{color:#8a1a1a;}
   <main class="main">
     <div id="est" class="empty">
       <span class="big">📊</span>
-      <h2>Nenhum arquivo carregado</h2>
-      <p>Carregue o razão analítico (.xlsx) para iniciar.</p>
+      <h2 id="est-title">Nenhuma empresa selecionada</h2>
+      <p id="est-msg">Selecione uma empresa existente ou clique em <strong>+ Nova empresa</strong> no topo, depois carregue o razão analítico (.xlsx).</p>
     </div>
     <div id="lst" class="loading" style="display:none">
       <p>Processando razão contábil...</p>
@@ -304,22 +364,19 @@ td.cred{color:#8a1a1a;}
           <label>Tipo de Conta</label>
           <select class="tf-tipo" id="tf-tipo" onchange="syncConta()">
             <option value="">Todos os tipos</option>
-            <option value="1.1.1">Caixa e Bancos (1.1.1)</option>
-            <option value="1.1.2">Aplicações Financeiras (1.1.2)</option>
-            <option value="1.1.3">A Receber (1.1.3)</option>
-            <option value="1.1.4">Outros Ativos Circ. (1.1.4)</option>
-            <option value="1.2.1">Ativo Não Circulante (1.2.1)</option>
-            <option value="2.1.2">Fornecedores (2.1.2)</option>
-            <option value="2.1.3">Obrig. Trabalhistas (2.1.3)</option>
-            <option value="2.1.4">Obrig. Tributárias (2.1.4)</option>
-            <option value="2.1.5">Outras c/ Pagar (2.1.5)</option>
-            <option value="2.2.1">Passivo Longo Prazo (2.2.1)</option>
-            <option value="2.2.4">Outros Passivos (2.2.4)</option>
           </select>
         </div>
-        <div class="tfg">
+        <div class="tfg tf-conta-wrap">
           <label>Conta Contábil</label>
-          <select class="tf-conta" id="tf-conta"><option value="">Todas as contas</option></select>
+          <button type="button" class="tf-conta-btn" id="tf-conta-btn" onclick="toggleContaDropdown()">Todas as contas ▾</button>
+          <div class="tf-conta-dropdown" id="tf-conta-dropdown">
+            <input type="text" class="tf-conta-busca" id="tf-conta-busca" placeholder="🔍 buscar conta ou descrição..." oninput="renderContaCheckboxes()">
+            <div class="tf-conta-actions">
+              <button type="button" onclick="contaMarcarTodas(true)">Marcar todas</button>
+              <button type="button" onclick="contaMarcarTodas(false)">Nenhuma</button>
+            </div>
+            <div class="tf-conta-list" id="tf-conta-list"></div>
+          </div>
         </div>
         <div class="tfg">
           <label>Filial</label>
@@ -340,18 +397,20 @@ td.cred{color:#8a1a1a;}
       <!-- SALDO ABERTURA -->
       <div class="saldo-bar" id="saldo-bar">
         <label id="saldo-nat-label">Saldo de Abertura (31/12/2025):</label>
-        <div id="saldo-conta-lbl" style="font-size:11px;color:var(--warn);font-family:var(--mono);background:#fff8e0;border:1px solid #e8d88a;border-radius:4px;padding:2px 8px;white-space:nowrap;">
+        <div id="saldo-conta-lbl" style="font-size:11px;color:var(--warn);font-family:var(--mono);background:var(--saldo-lbl-bg);border:1px solid var(--saldo-border);border-radius:4px;padding:2px 8px;white-space:nowrap;">
           Selecione uma conta contábil
         </div>
         <input type="number" id="saldo-in" step="0.01" placeholder="Ex: 886015.17" disabled style="opacity:.5">
         <button class="sbtn" id="saldo-btn" onclick="aplicarSaldo()" disabled style="opacity:.5">Aplicar</button>
         <div style="width:1px;height:24px;background:var(--border2);margin:0 4px;"></div>
-        <button class="sbtn" id="comp-btn" onclick="document.getElementById('comp-fi').click()" disabled style="opacity:.5;background:#6b3fa0;">📎 Composição</button>
+        <button class="sbtn" id="saldo-lote-btn" onclick="abrirSaldosLote()" style="background:var(--accent);font-weight:bold;">📋 Saldos em lote</button>
+        <div style="width:1px;height:24px;background:var(--border2);margin:0 4px;"></div>
+        <button class="sbtn" id="comp-btn" onclick="document.getElementById('comp-fi').click()" disabled style="opacity:.5;background:var(--ret);">📎 Composição</button>
         <input type="file" id="comp-fi" accept=".xlsx,.xls,.csv" style="display:none" onchange="loadComposicao(this)">
         <div id="comp-lbl" style="font-size:11px;color:var(--ret);display:none;"></div>
-        <button class="sbtn" id="comp-clear-btn" onclick="clearComposicao()" style="display:none;background:#999;font-size:10px;padding:0 8px;">✕ Composição</button>
+        <button class="sbtn" id="comp-clear-btn" onclick="clearComposicao()" style="display:none;background:var(--neutral);font-size:10px;padding:0 8px;">✕ Composição</button>
         <div id="saldo-bdg" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
-        <span id="saldo-hint" class="saldo-hint">ℹ️ Selecione uma conta contábil no filtro acima para habilitar este campo</span>
+        <span id="saldo-hint" class="saldo-hint">ℹ️ Conta única: selecione uma conta acima. Para informar <strong>todas de uma vez</strong>, use <strong>📋 Saldos em lote</strong>.</span>
       </div>
 
       <!-- TABS -->
@@ -363,8 +422,9 @@ td.cred{color:#8a1a1a;}
         <button class="ptab" onclick="showP('razao')">Razão Completo</button>
         <button class="ptab" onclick="showP('contas')">Por Conta</button>
         <button class="ptab" style="background:var(--accent);color:white;border-radius:4px 4px 0 0;font-weight:bold;" onclick="showP('resultado')">★ Resultado Final</button>
-        <button class="ptab" style="background:#8a1a1a;color:white;border-radius:4px 4px 0 0;font-weight:bold;" onclick="showP('diverg')">⚠ Divergências</button>
+        <button class="ptab" style="background:var(--danger);color:white;border-radius:4px 4px 0 0;font-weight:bold;" onclick="showP('diverg')">⚠ Divergências</button>
         <button class="ptab" style="background:var(--info);color:white;border-radius:4px 4px 0 0;font-weight:bold;" onclick="showP('validfin')">🔗 Validação Financeiro</button>
+        <button class="ptab" style="background:var(--tribut);color:white;border-radius:4px 4px 0 0;font-weight:bold;" onclick="showP('tribut')">📊 IRPJ/CSLL</button>
       </div>
 
       <!-- METRICS -->
@@ -397,6 +457,19 @@ td.cred{color:#8a1a1a;}
       <div class="ca" id="panel-resumo">
         <div class="sgrid" id="sgrid"></div>
         <div id="stbl"></div>
+        <div style="margin-top:1.2rem;display:flex;align-items:center;gap:8px;">
+          <button class="bsm" id="resumo-toggle-abertos" onclick="toggleResumoAbertos()">👁 Mostrar itens em aberto</button>
+          <span style="font-size:11px;color:var(--text3)">Detalhamento dos itens em aberto da conta/filtro atual, sem precisar trocar de aba.</span>
+        </div>
+        <div class="tw" id="resumo-abertos-wrap" style="display:none;margin-top:.6rem;">
+          <table>
+            <thead><tr>
+              <th>Data</th><th>NF / Doc</th><th>Razão Social</th><th>Conta</th>
+              <th>Histórico</th><th>Débito</th><th>Crédito</th><th>Saldo Aberto</th><th>Status</th>
+            </tr></thead>
+            <tbody id="tb-resumo-abertos"></tbody>
+          </table>
+        </div>
       </div>
 
       <div class="ca" id="panel-concil" style="display:none">
@@ -501,7 +574,7 @@ td.cred{color:#8a1a1a;}
 
       <!-- DIVERGÊNCIAS -->
       <div class="ca" id="panel-diverg" style="display:none">
-        <div style="background:var(--danger-bg);border:1px solid #e8a8a8;border-radius:6px;padding:.9rem;margin-bottom:1rem;">
+        <div style="background:var(--danger-bg);border:1px solid var(--danger-border);border-radius:6px;padding:.9rem;margin-bottom:1rem;">
           <div style="font-size:13px;font-weight:bold;color:var(--danger);margin-bottom:4px">⚠ Lançamentos sem contrapartida identificada ou pendentes de revisão</div>
           <div style="font-size:11px;color:var(--text2)">Créditos com recebimento mas sem NF de débito no período — provavelmente referentes ao saldo anterior não carregado na composição. Débitos sem recebimento correspondente aparecem na aba Em Aberto. <strong>Comp. Unificada</strong>: o sistema encontrou um grupo de lançamentos cuja soma bate com um único lançamento do lado oposto (pagamento/recebimento unificado) — confirme manualmente antes de considerar conciliado, pois soma coincidente entre itens não relacionados é possível.</div>
         </div>
@@ -614,6 +687,78 @@ td.cred{color:#8a1a1a;}
         </div>
       </div>
 
+      <!-- IRPJ / CSLL -->
+      <div class="ca" id="panel-tribut" style="display:none">
+
+        <!-- Upload -->
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:1rem;align-items:flex-start;">
+          <div style="flex:1;min-width:220px;">
+            <div style="font-size:11px;font-weight:bold;color:var(--tribut);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">📊 Planilha ANUAL — Lucro Real (IRPJ / CSLL)</div>
+            <div class="vf-upload-zone" id="trib-upload-zone" onclick="document.getElementById('trib-fi').click()">
+              <div style="font-size:18px;margin-bottom:4px">📄</div>
+              <div style="font-size:12px;color:var(--text2)"><strong>Carregar planilha ANUAL</strong><br>.xlsx · aba "ANUAL"</div>
+            </div>
+            <input type="file" id="trib-fi" accept=".xlsx,.xls" style="display:none" onchange="loadTributario(this.files[0])">
+            <div id="trib-filename" style="font-size:11px;color:var(--accent);margin-top:4px;"></div>
+          </div>
+        </div>
+
+        <!-- Estado vazio -->
+        <div id="trib-empty" style="text-align:center;color:var(--text2);padding:40px 0;">
+          <div style="font-size:32px;margin-bottom:8px;">📊</div>
+          <div style="font-size:14px;font-weight:bold;">Nenhuma planilha carregada</div>
+          <div style="font-size:12px;margin-top:4px;">Carregue o arquivo <strong>.xlsx</strong> com a aba <strong>ANUAL</strong> para visualizar a apuração de IRPJ e CSLL.</div>
+        </div>
+
+        <!-- Conteúdo após upload -->
+        <div id="trib-content" style="display:none">
+
+          <!-- Seletor de meses -->
+          <div id="trib-mes-bar" class="ptabs" style="margin-bottom:12px;flex-wrap:wrap;"></div>
+
+          <!-- Cards de resumo -->
+          <div class="metrics" style="margin-bottom:1rem;">
+            <div class="metric" style="min-width:160px;">
+              <span class="mlbl">CSLL a Pagar</span>
+              <span class="mval danger" id="trib-card-csll">—</span>
+            </div>
+            <div class="metric" style="min-width:160px;">
+              <span class="mlbl">IRPJ a Pagar</span>
+              <span class="mval danger" id="trib-card-irpj">—</span>
+            </div>
+            <div class="metric" style="min-width:160px;">
+              <span class="mlbl">Base CSLL</span>
+              <span class="mval warn" id="trib-card-bcsll">—</span>
+            </div>
+            <div class="metric" style="min-width:160px;">
+              <span class="mlbl">Base IRPJ</span>
+              <span class="mval warn" id="trib-card-birpj">—</span>
+            </div>
+          </div>
+
+          <!-- Tabela de apuração -->
+          <div class="tw">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:130px;">Conta Contábil</th>
+                  <th>Descrição</th>
+                  <th style="text-align:right;width:170px;">Valor</th>
+                </tr>
+              </thead>
+              <tbody id="trib-tbody"></tbody>
+            </table>
+          </div>
+
+          <!-- Exports -->
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+            <button class="sbtn" onclick="expTributCSV()">⬇ Exportar CSV</button>
+            <button class="sbtn" style="background:var(--accent);" onclick="expTributXLSX()">⬇ Exportar XLSX</button>
+          </div>
+
+        </div>
+      </div>
+
     </div><!-- /app -->
   </main>
 </div>
@@ -622,11 +767,12 @@ td.cred{color:#8a1a1a;}
 
 // ── SISTEMA CONTÁBIL ──────────────────────────────────────────────────────
 let _sistema = 'mkb'; // 'mkb' | 'dominio'
-function setSystem(s){
+// Atualiza botões/badge/hints sem confirmar nem apagar dados (usado ao trocar
+// de empresa, restaurando o sistema salvo dela)
+function setSystemSilent(s){
   _sistema = s;
   ['mkb','dominio'].forEach(x=>document.getElementById('btn-'+x).classList.toggle('active',x===s));
   document.getElementById('sys-badge').textContent = s==='mkb'?'Protheus ativo':'Domínio ativo';
-  // Atualizar hint e zona de upload
   var hint = document.getElementById('sys-hint');
   var uzp  = document.getElementById('uz-prompt');
   if(s==='dominio'){
@@ -638,19 +784,344 @@ function setSystem(s){
     if(hint) hint.style.color='rgba(255,255,255,.4)';
     if(uzp)  uzp.innerHTML = '<strong>Clique para carregar</strong><br>ou arraste o .xlsx aqui';
   }
-  // Resetar dados se já havia arquivo carregado
-  if(allData.length){
-    if(!confirm('Trocar o sistema irá limpar os dados atuais. Continuar?')){
-      setSystem(_sistema==='mkb'?'dominio':'mkb'); return;
-    }
-    allData=[];filtData=[];pares=[];
-    document.getElementById('app').style.display='none';
-    document.getElementById('est').style.display='block';
+}
+// Acionado pelos botões Protheus/Domínio. Não apaga dados — o sistema escolhido
+// vale para o PRÓXIMO arquivo carregado e é salvo na empresa atual.
+async function setSystem(s){
+  if(s===_sistema) return;
+  setSystemSilent(s);
+  if(_empresaAtual){
+    try{
+      const emp=await dbGetEmpresa(_empresaAtual) || {nome:_empresaAtual, saldosAbertura:{}, criadoEm:new Date().toISOString()};
+      emp.sistema=s; emp.atualizadoEm=new Date().toISOString();
+      await dbSaveEmpresa(emp);
+    }catch(err){ dbErr(err); }
   }
 }
 
+// ── TEMA (claro/escuro) ─────────────────────────────────────────────────────
+// O <head> já aplicou o tema salvo antes da pintura inicial (evita flash);
+// aqui só sincronizamos o botão e tratamos o clique de alternância.
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme', t==='dark' ? 'dark' : 'light');
+  try{ localStorage.setItem('cc_theme', t); }catch(e){}
+  const btn=document.getElementById('theme-toggle-btn');
+  if(btn) btn.textContent = t==='dark' ? '☀️ Claro' : '🌙 Escuro';
+}
+function toggleTheme(){
+  const atual=document.documentElement.getAttribute('data-theme')==='dark' ? 'dark' : 'light';
+  applyTheme(atual==='dark' ? 'light' : 'dark');
+}
+(function initTheme(){
+  let salvo='light';
+  try{ salvo=localStorage.getItem('cc_theme')||'light'; }catch(e){}
+  applyTheme(salvo);
+})();
+
 // ── STATE ─────────────────────────────────────────────────────────────────
 let allData=[], filtData=[], pares=[], statusF='all', sortSt={}, saldosAbertura={}, composicaoItens={}, finData={rec:[], pag:[]}; // composicaoItens: {conta_cod: [{nf,razao,valor,data}]}
+let tributData=[], tributMeses=[], tributMesAtivo=null; // módulo IRPJ/CSLL — Lucro Real anual
+// Contas marcadas no filtro "Conta Contábil" (multi-seleção via checkbox).
+// null = sem filtro (todas implícitas); Set (mesmo vazio) = seleção explícita.
+let _contasFiltro = null;
+// Exibir/ocultar a lista detalhada de itens em aberto dentro da aba Resumo.
+let _resumoAbertosVisivel = false;
+
+// ── EMPRESA ATIVA (multiempresa) ─────────────────────────────────────────
+let _empresaAtual = '';
+
+// ── COMPETÊNCIA (YYYY-MM) ─────────────────────────────────────────────────
+const MESES_ABREV=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+function competenciaDe(t){
+  const d=t.data;
+  return (d instanceof Date && !isNaN(d)) ? d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0') : null;
+}
+function fmtCompetencia(c){
+  const p=c.split('-'); return MESES_ABREV[parseInt(p[1],10)-1]+'/'+p[0];
+}
+
+// ── BANCO LOCAL (IndexedDB) — multiempresa + histórico mensal ────────────
+// empresas: {nome, sistema, saldosAbertura, criadoEm, atualizadoEm}
+// periodos: {id:'<empresa>|<YYYY-MM>', empresa, competencia, lancamentos, atualizadoEm}
+const DB_NAME='conciliacao_contabil_db', DB_VERSION=1;
+let _dbPromise=null;
+function dbOpen(){
+  if(_dbPromise) return _dbPromise;
+  _dbPromise=new Promise((resolve,reject)=>{
+    const req=indexedDB.open(DB_NAME,DB_VERSION);
+    req.onupgradeneeded=e=>{
+      const db=e.target.result;
+      if(!db.objectStoreNames.contains('empresas')) db.createObjectStore('empresas',{keyPath:'nome'});
+      if(!db.objectStoreNames.contains('periodos')){
+        const st=db.createObjectStore('periodos',{keyPath:'id'});
+        st.createIndex('empresa','empresa',{unique:false});
+      }
+    };
+    req.onsuccess=e=>resolve(e.target.result);
+    req.onerror=e=>reject(e.target.error);
+  });
+  return _dbPromise;
+}
+async function dbListEmpresas(){
+  const db=await dbOpen();
+  return new Promise((resolve,reject)=>{
+    const req=db.transaction('empresas','readonly').objectStore('empresas').getAll();
+    req.onsuccess=()=>resolve(req.result||[]);
+    req.onerror=e=>reject(e.target.error);
+  });
+}
+async function dbGetEmpresa(nome){
+  const db=await dbOpen();
+  return new Promise((resolve,reject)=>{
+    const req=db.transaction('empresas','readonly').objectStore('empresas').get(nome);
+    req.onsuccess=()=>resolve(req.result||null);
+    req.onerror=e=>reject(e.target.error);
+  });
+}
+async function dbSaveEmpresa(emp){
+  const db=await dbOpen();
+  return new Promise((resolve,reject)=>{
+    const req=db.transaction('empresas','readwrite').objectStore('empresas').put(emp);
+    req.onsuccess=()=>resolve();
+    req.onerror=e=>reject(e.target.error);
+  });
+}
+async function dbDeleteEmpresa(nome){
+  const db=await dbOpen();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(['empresas','periodos'],'readwrite');
+    tx.objectStore('empresas').delete(nome);
+    const cur=tx.objectStore('periodos').index('empresa').openCursor(IDBKeyRange.only(nome));
+    cur.onsuccess=e=>{const c=e.target.result; if(c){c.delete();c.continue();}};
+    tx.oncomplete=()=>resolve();
+    tx.onerror=e=>reject(e.target.error);
+  });
+}
+async function dbGetPeriodos(nomeEmpresa){
+  const db=await dbOpen();
+  return new Promise((resolve,reject)=>{
+    const req=db.transaction('periodos','readonly').objectStore('periodos').index('empresa').getAll(IDBKeyRange.only(nomeEmpresa));
+    req.onsuccess=()=>resolve(req.result||[]);
+    req.onerror=e=>reject(e.target.error);
+  });
+}
+async function dbSavePeriodo(nomeEmpresa,competencia,lancamentos){
+  const db=await dbOpen();
+  return new Promise((resolve,reject)=>{
+    const req=db.transaction('periodos','readwrite').objectStore('periodos').put({
+      id:nomeEmpresa+'|'+competencia, empresa:nomeEmpresa, competencia, lancamentos,
+      atualizadoEm:new Date().toISOString()
+    });
+    req.onsuccess=()=>resolve();
+    req.onerror=e=>reject(e.target.error);
+  });
+}
+async function dbDeletePeriodo(nomeEmpresa,competencia){
+  const db=await dbOpen();
+  return new Promise((resolve,reject)=>{
+    const req=db.transaction('periodos','readwrite').objectStore('periodos').delete(nomeEmpresa+'|'+competencia);
+    req.onsuccess=()=>resolve();
+    req.onerror=e=>reject(e.target.error);
+  });
+}
+function dbErr(err){
+  console.error('IndexedDB:',err);
+  alert('Erro ao acessar o banco local (IndexedDB) deste navegador:\n'+(err&&err.message?err.message:err)+
+    '\n\nVerifique se o navegador não está em modo de navegação anônima com armazenamento bloqueado.');
+}
+
+// ── GESTÃO DE EMPRESAS ────────────────────────────────────────────────────
+async function popularEmpresas(selecionar){
+  try{
+    const sel=document.getElementById('empresa-sel');
+    const empresas=await dbListEmpresas();
+    empresas.sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+    sel.innerHTML='<option value="">— Selecione ou crie uma empresa —</option>'
+      + empresas.map(e=>'<option value="'+e.nome.replace(/"/g,'&quot;')+'">'+e.nome+'</option>').join('');
+    sel.value=(selecionar && empresas.find(e=>e.nome===selecionar)) ? selecionar : '';
+    await onEmpresaChange();
+  }catch(err){ dbErr(err); }
+}
+
+async function novaEmpresa(){
+  const nome=prompt('Nome da nova empresa:');
+  if(nome===null) return;
+  const nomeT=nome.trim();
+  if(!nomeT){ alert('Informe um nome válido.'); return; }
+  try{
+    const existentes=await dbListEmpresas();
+    if(existentes.find(e=>e.nome.toLowerCase()===nomeT.toLowerCase())){
+      alert('Já existe uma empresa cadastrada com esse nome. Selecione-a na lista.');
+      return;
+    }
+    await dbSaveEmpresa({nome:nomeT, sistema:_sistema, saldosAbertura:{}, criadoEm:new Date().toISOString()});
+    await popularEmpresas(nomeT);
+  }catch(err){ dbErr(err); }
+}
+
+async function renomearEmpresa(){
+  if(!_empresaAtual) return;
+  const novo=prompt('Novo nome para "'+_empresaAtual+'":', _empresaAtual);
+  if(novo===null) return;
+  const novoT=novo.trim();
+  if(!novoT || novoT===_empresaAtual) return;
+  try{
+    const existentes=await dbListEmpresas();
+    if(existentes.find(e=>e.nome.toLowerCase()===novoT.toLowerCase())){
+      alert('Já existe uma empresa com esse nome.'); return;
+    }
+    const empAntiga=await dbGetEmpresa(_empresaAtual) || {sistema:_sistema, saldosAbertura:{}, criadoEm:new Date().toISOString()};
+    const periodos=await dbGetPeriodos(_empresaAtual);
+    await dbSaveEmpresa({...empAntiga, nome:novoT, atualizadoEm:new Date().toISOString()});
+    for(const p of periodos) await dbSavePeriodo(novoT,p.competencia,p.lancamentos);
+    await dbDeleteEmpresa(_empresaAtual);
+    await popularEmpresas(novoT);
+  }catch(err){ dbErr(err); }
+}
+
+async function excluirEmpresa(){
+  if(!_empresaAtual) return;
+  if(!confirm('Excluir a empresa "'+_empresaAtual+'" e TODOS os períodos salvos dela neste navegador?\n\nEsta ação não pode ser desfeita.')) return;
+  try{
+    await dbDeleteEmpresa(_empresaAtual);
+    localStorage.removeItem('cc_ultima_empresa');
+    await popularEmpresas('');
+  }catch(err){ dbErr(err); }
+}
+
+async function onEmpresaChange(){
+  _empresaAtual=document.getElementById('empresa-sel').value;
+  const mostrarBtns=!!_empresaAtual;
+  document.getElementById('renomear-empresa-btn').style.display=mostrarBtns?'':'none';
+  document.getElementById('excluir-empresa-btn').style.display=mostrarBtns?'':'none';
+  document.getElementById('empresa-display').textContent=_empresaAtual?'📂 '+_empresaAtual:'';
+
+  if(_empresaAtual) localStorage.setItem('cc_ultima_empresa',_empresaAtual);
+  else localStorage.removeItem('cc_ultima_empresa');
+
+  composicaoItens={}; finData={rec:[],pag:[]};
+
+  if(!_empresaAtual){
+    saldosAbertura={};
+    document.getElementById('empresa-info').textContent='';
+  } else {
+    try{
+      const emp=await dbGetEmpresa(_empresaAtual);
+      saldosAbertura=(emp && emp.saldosAbertura)?{...emp.saldosAbertura}:{};
+      setSystemSilent((emp && emp.sistema)||'mkb');
+    }catch(err){ dbErr(err); saldosAbertura={}; }
+  }
+  await carregarPeriodosEmpresa();
+}
+
+// ── PERÍODOS (histórico mensal por empresa) ──────────────────────────────
+function renderPeriodoChips(comps){
+  const panel=document.getElementById('periodos-panel');
+  const el=document.getElementById('periodos-chips');
+  if(!comps.length){ panel.style.display='none'; el.innerHTML=''; return; }
+  panel.style.display='block';
+  el.innerHTML=comps.map(c=>
+    '<span class="periodo-chip">'+fmtCompetencia(c)+
+    ' <span class="rm" onclick="removerPeriodo(\''+c+'\')" title="Remover este período">✕</span></span>'
+  ).join('');
+}
+function updEmpresaInfo(periodos){
+  const el=document.getElementById('empresa-info');
+  if(!periodos.length){ el.textContent=''; return; }
+  el.textContent=periodos.length+' período(s) salvo(s) · '+fmtCompetencia(periodos[0].competencia)+' a '+fmtCompetencia(periodos[periodos.length-1].competencia);
+}
+async function removerPeriodo(comp){
+  if(!confirm('Remover o período '+fmtCompetencia(comp)+' de "'+_empresaAtual+'"?\n\nOs lançamentos desse mês serão apagados do banco local deste navegador.')) return;
+  try{
+    await dbDeletePeriodo(_empresaAtual,comp);
+    await carregarPeriodosEmpresa();
+  }catch(err){ dbErr(err); }
+}
+async function carregarPeriodosEmpresa(){
+  if(!_empresaAtual){
+    renderPeriodoChips([]);
+    allData=[];filtData=[];pares=[];
+    document.getElementById('app').style.display='none';
+    document.getElementById('lst').style.display='none';
+    document.getElementById('est').style.display='block';
+    document.getElementById('est-title').textContent='Nenhuma empresa selecionada';
+    document.getElementById('est-msg').innerHTML='Selecione uma empresa existente ou clique em <strong>+ Nova empresa</strong> no topo, depois carregue o razão analítico (.xlsx).';
+    return;
+  }
+  let periodos=[];
+  try{ periodos=await dbGetPeriodos(_empresaAtual); }catch(err){ dbErr(err); }
+  periodos.sort((a,b)=>a.competencia.localeCompare(b.competencia));
+  renderPeriodoChips(periodos.map(p=>p.competencia));
+  updEmpresaInfo(periodos);
+
+  if(!periodos.length){
+    allData=[];filtData=[];pares=[];
+    document.getElementById('app').style.display='none';
+    document.getElementById('lst').style.display='none';
+    document.getElementById('est').style.display='block';
+    document.getElementById('est-title').textContent='Nenhum período carregado';
+    document.getElementById('est-msg').innerHTML='Carregue o razão analítico (.xlsx) de <strong>'+_empresaAtual+'</strong> para começar.';
+    return;
+  }
+
+  let tx=[];
+  periodos.forEach(p=>{ tx=tx.concat(p.lancamentos); });
+  document.getElementById('est').style.display='none';
+  document.getElementById('lst').style.display='block';
+  setP(80,'Recalculando conciliação acumulada — '+periodos.length+' período(s)...');
+  setTimeout(()=>classifyAll(tx),50);
+}
+
+// ── NOVO UPLOAD: agrupa por competência, detecta conflito com o já salvo,
+// mescla com o histórico acumulado da empresa ────────────────────────────
+async function handleNovoUpload(tx){
+  if(!_empresaAtual){
+    alert('Selecione uma empresa (ou clique em "+ Nova empresa") antes de carregar o razão.');
+    document.getElementById('lst').style.display='none';
+    document.getElementById('est').style.display='block';
+    return;
+  }
+
+  const grupos={};
+  let semData=0;
+  tx.forEach(t=>{
+    const comp=competenciaDe(t);
+    if(!comp){ semData++; return; }
+    (grupos[comp]=grupos[comp]||[]).push(t);
+  });
+  const novasComp=Object.keys(grupos).sort();
+  if(!novasComp.length){
+    alert('Não foi possível identificar o período (mês/ano) dos lançamentos deste arquivo.');
+    document.getElementById('lst').style.display='none';
+    document.getElementById('est').style.display='block';
+    return;
+  }
+
+  try{
+    const existentes=await dbGetPeriodos(_empresaAtual);
+    const existMap={}; existentes.forEach(p=>existMap[p.competencia]=true);
+    const conflitos=novasComp.filter(c=>existMap[c]);
+
+    let substituir=true;
+    if(conflitos.length){
+      const lbl=conflitos.map(fmtCompetencia).join(', ');
+      substituir=confirm(
+        'Os períodos '+lbl+' já estão salvos para "'+_empresaAtual+'".\n\n'+
+        'OK = substituir esses meses pelos dados deste arquivo.\n'+
+        'Cancelar = manter os dados já salvos e ignorar esses meses do arquivo novo.'
+      );
+    }
+
+    setP(85,'Salvando períodos em "'+_empresaAtual+'"...');
+    for(const comp of novasComp){
+      if(conflitos.includes(comp) && !substituir) continue;
+      await dbSavePeriodo(_empresaAtual,comp,grupos[comp]);
+    }
+    if(semData>0) console.warn(semData+' lançamento(s) sem data identificável não foram salvos.');
+
+    await carregarPeriodosEmpresa();
+  }catch(err){ dbErr(err); }
+}
 
 // ── UTILS ─────────────────────────────────────────────────────────────────
 const fBRL=v=>(isNaN(v)||v===null)?'—':new Intl.NumberFormat('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(v);
@@ -730,6 +1201,10 @@ uz.addEventListener('dragleave',()=>uz.classList.remove('drag'));
 uz.addEventListener('drop',e=>{e.preventDefault();uz.classList.remove('drag');if(e.dataTransfer.files[0])loadF(e.dataTransfer.files[0]);});
 
 function loadF(file){
+  if(!_empresaAtual){
+    alert('Selecione uma empresa (ou clique em "+ Nova empresa") antes de carregar o razão.');
+    return;
+  }
   document.getElementById('est').style.display='none';
   document.getElementById('lst').style.display='block';
   document.getElementById('app').style.display='none';
@@ -876,7 +1351,7 @@ function processWS_dominio(ws){
   }
 
   setP(65,'Conciliando...');
-  setTimeout(()=>classifyAll(tx),50);
+  setTimeout(()=>handleNovoUpload(tx),50);
 }
 
 
@@ -909,12 +1384,36 @@ function processWS(ws){
     }
   }
   setP(65,'Conciliando...');
-  setTimeout(()=>classifyAll(tx),50);
+  setTimeout(()=>handleNovoUpload(tx),50);
 }
 
 // ── CONTAS DE CONTROLE ────────────────────────────────────────────────────
+// Lista whitelist clássica (planos de 3 níveis tipo Protheus).
 const OPFX=['1.1.2','1.1.3','1.1.4','1.1.5','1.2.1','1.2.3','1.2.5','2.1.2','2.1.3','2.1.4','2.1.5','2.1.6','2.2.1','2.2.2','2.2.4','2.2.6'];
-const isOA=cod=>cod&&OPFX.some(p=>cod.startsWith(p));
+// Descrição → não conciliável (caixa, banco, aplicação financeira, disponibilidades).
+// Reconcilia-se contra extrato bancário, não contra NF.
+const NON_OA_DESC = /\b(caixa|banco|bancos|tesouraria|aplica[çc][aã]o\s+financeira|aplica[çc][oõ]es?\s+financeiras?|cdb|fundo\s+de\s+investimento|disponibilidad)/i;
+// Cache descrição → código (preenchido em classifyAll, antes do isOA rodar).
+let _descByCod = {};
+
+function isOA(cod){
+  if(!cod) return false;
+  // Whitelist clássica primeiro (retrocompatibilidade).
+  if(OPFX.some(p=>cod.startsWith(p))) return true;
+  // Contas de resultado (3..9) nunca são open-account.
+  if(/^[3-9]/.test(cod)) return false;
+  // Caixa/Banco pela descrição (cobre planos com numeração diferente) — tem
+  // prioridade sobre o prefixo, pois algumas empresas usam "1.1.1.xx" para
+  // contas que NÃO são caixa/banco (ex.: 1.1.1.20.10025 — ISS a recuperar).
+  const d = _descByCod[cod] || '';
+  if(NON_OA_DESC.test(d)) return false;
+  // Caixa/Banco pelo prefixo clássico 1.1.1 — só como fallback quando não há
+  // descrição disponível para confirmar.
+  if(!d && /^1\.1\.1(?:\.|$)/.test(cod)) return false;
+  // Default: Ativo/Passivo Circulante e Não-Circulante (1.1.*, 1.2.*, 2.1.*, 2.2.*).
+  if(/^[12]\.[12]\./.test(cod)) return true;
+  return false;
+}
 
 // ── COMPENSAÇÃO POR SOMA (pagamento/recebimento unificado) ─────────────────
 // Um único lançamento pode, na prática, corresponder à SOMA de vários
@@ -1010,6 +1509,9 @@ function buscarCompensacaoUnificada(items){
 
 // ── CLASSIFICAÇÃO ─────────────────────────────────────────────────────────
 function classifyAll(tx){
+  // Cache descrição por código antes de chamar isOA (a heurística usa descrição).
+  _descByCod = {};
+  tx.forEach(t=>{ if(t.conta_cod && !_descByCod[t.conta_cod]) _descByCod[t.conta_cod] = t.conta_desc || ''; });
   tx.forEach(t=>{t.is_open_account=isOA(t.conta_cod);if(!t.is_open_account)t.status='na';});
   const cmap={};
   tx.filter(t=>t.is_open_account).forEach(t=>{if(!cmap[t.conta_cod])cmap[t.conta_cod]=[];cmap[t.conta_cod].push(t);});
@@ -1022,10 +1524,15 @@ function classifyAll(tx){
     // Lançamentos sem NF podem casar por valor (compensação genérica).
     // ───────────────────────────────────────────────────────────────────────
 
-    // 1. Match por NF exata: débito (VL.NF.) × crédito (VL.REC./VL.RECEBIDO)
-    // Apenas lançamentos ainda 'open' e com NF identificada
-    const nfIt = items.filter(t => t.is_nf  && t.debito>0  && t.nf && t.status==='open');
-    const rcIt = items.filter(t => t.is_rec  && t.credito>0 && t.nf && t.status==='open');
+    // 1. Match por NF exata: débito × crédito com a MESMA NF extraída.
+    // Apenas lançamentos ainda 'open' e com NF identificada — o critério é o
+    // número da NF (exNF), não as palavras-chave do histórico (is_nf/is_rec):
+    // históricos como "RPS SAIDA 000010372" (débito) ou "BX REF NF - 000010372"
+    // (crédito) não batem com nenhuma palavra-chave conhecida, mas têm a NF
+    // certinha extraída — exigir is_nf/is_rec aqui deixava esses pares
+    // presos em "Em Aberto" para sempre, mesmo com NF e valor batendo.
+    const nfIt = items.filter(t => t.debito>0  && t.nf && t.status==='open');
+    const rcIt = items.filter(t => t.credito>0 && t.nf && t.status==='open');
     const usedR = new Set();
 
     nfIt.forEach(nf => {
@@ -1089,10 +1596,10 @@ function classifyAll(tx){
   setP(90,'Renderizando...');
   setTimeout(()=>{
     allData=tx;filtData=[...allData];
+    reaplicarSaldosSalvos();
     buildUI();setP(100,'');
     document.getElementById('lst').style.display='none';
     const ap=document.getElementById('app');ap.style.display='flex';
-    document.getElementById('fpanel').style.display='block';
     document.getElementById('lpanel').style.display='block';
   },50);
 }
@@ -1123,7 +1630,7 @@ function syncSaldoBar(){
     const cb2=document.getElementById('comp-btn');
     if(cb2){cb2.disabled=true;cb2.style.opacity='.4';}
     const h=document.getElementById('saldo-hint');
-    if(h) h.textContent='ℹ️ Selecione uma conta contábil no filtro acima para habilitar este campo';
+    if(h) h.textContent='ℹ️ Conta única: selecione uma conta. Para todas de uma vez, use 📋 Saldos em lote.';
   } else {
     const t=allData.find(x=>x.conta_cod===conta);
     lbl.textContent=(conta+(t?' — '+t.conta_desc:''));
@@ -1170,6 +1677,16 @@ function aplicarSaldo(){
   const val=parseFloat(document.getElementById('saldo-in').value);
   if(isNaN(val)||val<0){ alert('Informe um valor válido (pode ser 0,00).'); return; }
 
+  aplicarSaldoConta(conta, val);
+  persistSaldos();
+  renderBadges();
+  renderAll();
+}
+
+// Aplica/absorve o saldo de abertura de UMA conta em allData. Usada tanto pelo
+// botão "Aplicar" (aplicarSaldo) quanto para reaplicar saldos já salvos da
+// empresa após (re)carregar/acumular períodos (reaplicarSaldosSalvos).
+function aplicarSaldoConta(conta, val){
   // Resetar lançamentos anteriores desta conta antes de recalcular
   allData.forEach(t=>{if(t._was_ant&&t.conta_cod===conta){t.status=t._orig_st||'open';t._was_ant=false;t.match_status='';}});
 
@@ -1262,14 +1779,31 @@ function aplicarSaldo(){
         t.match_status += ' (parcial — período: '+fBRL(t.saldo_aberto)+')';
     });
   }
+}
 
-  renderBadges();
-  renderAll();
+// Reaplica todos os saldos de abertura já salvos da empresa atual sobre o
+// allData recém-carregado (ex.: após acumular novos períodos ou trocar empresa).
+function reaplicarSaldosSalvos(){
+  Object.entries(saldosAbertura).forEach(([conta,val])=>{
+    if(allData.some(t=>t.conta_cod===conta)) aplicarSaldoConta(conta, val);
+  });
+}
+
+// Grava saldosAbertura no registro da empresa atual (IndexedDB).
+function persistSaldos(){
+  if(!_empresaAtual) return;
+  dbGetEmpresa(_empresaAtual).then(emp=>{
+    emp = emp || {nome:_empresaAtual, sistema:_sistema, criadoEm:new Date().toISOString()};
+    emp.saldosAbertura={...saldosAbertura};
+    emp.atualizadoEm=new Date().toISOString();
+    return dbSaveEmpresa(emp);
+  }).catch(dbErr);
 }
 
 function remSaldo(conta){
   allData.forEach(t=>{if(t._was_ant&&t.conta_cod===conta){t.status=t._orig_st||'open';t._was_ant=false;t.match_status='';}});
   delete saldosAbertura[conta];
+  persistSaldos();
   const cur=getContaFiltrada();
   if(cur===conta){ document.getElementById('saldo-in').value=''; }
   renderBadges(); renderAll();
@@ -1288,7 +1822,7 @@ function renderBadges(){
     return `<span class="saldo-badge" title="${cod} — ${nm}">
       <span style="font-size:10px;opacity:.7">${cod}</span>
       &nbsp;${fBRL(val)}
-      ${rest>0?`<span style="font-size:10px;color:#c47a00"> | restante: ${fBRL(rest)}</span>`:'<span style="font-size:10px;color:var(--accent)"> ✓ zerado</span>'}
+      ${rest>0?`<span style="font-size:10px;color:var(--partial)"> | restante: ${fBRL(rest)}</span>`:'<span style="font-size:10px;color:var(--accent)"> ✓ zerado</span>'}
       <span class="rm" onclick="remSaldo('${cod}')" title="Remover">✕</span>
     </span>`;
   }).join('');
@@ -1299,53 +1833,180 @@ function buildUI(){popFilts();setContaAtual('');renderAll();renderAccList();rend
 function renderAll(){updMetrics();renderResumo();renderConcil();renderAbertos();renderRet();renderRazao();renderContas();renderResultado();renderDiverg();renderAccList();}
 
 function popFilts(){
-  const contas=[...new Set(allData.map(t=>t.conta_cod).filter(Boolean))].sort();
   const filiais=[...new Set(allData.map(t=>t.filial).filter(Boolean))].sort();
   const dates=allData.map(t=>t.data).filter(Boolean).sort((a,b)=>a-b);
-  const optC='<option value="">Todas as contas</option>'+contas.map(c=>{const t=allData.find(x=>x.conta_cod===c);return`<option value="${c}">${c} — ${t?t.conta_desc:''}</option>`;}).join('');
-  document.getElementById('tf-conta').innerHTML=optC;
-  document.getElementById('f-conta').innerHTML='<option value="">Todas</option>'+contas.map(c=>{const t=allData.find(x=>x.conta_cod===c);return`<option value="${c}">${c} — ${t?t.conta_desc:''}</option>`;}).join('');
-  const optF='<option value="">Todas</option>'+filiais.map(f=>`<option value="${f}">${f}</option>`).join('');
-  document.getElementById('tf-filial').innerHTML=document.getElementById('f-filial').innerHTML=optF;
-  if(dates.length){const ini=dates[0].toISOString().split('T')[0],fim=dates[dates.length-1].toISOString().split('T')[0];['tf-ini','f-ini'].forEach(id=>document.getElementById(id).value=ini);['tf-fim','f-fim'].forEach(id=>document.getElementById(id).value=fim);}
+  document.getElementById('tf-filial').innerHTML='<option value="">Todas</option>'+filiais.map(f=>`<option value="${f}">${f}</option>`).join('');
+  if(dates.length){const ini=dates[0].toISOString().split('T')[0],fim=dates[dates.length-1].toISOString().split('T')[0];document.getElementById('tf-ini').value=ini;document.getElementById('tf-fim').value=fim;}
+  popularTiposConta();
+  // Novo conjunto de dados → volta para "todas as contas" no filtro multi-seleção.
+  _contasFiltro=null;
+  updateContaBtnLabel();
+  renderContaCheckboxes();
+}
+
+// ── TIPO DE CONTA — gerado a partir do plano de contas REALMENTE carregado ──
+// (antes era uma lista fixa de prefixos pensada para um único cliente/plano
+// de contas; numa empresa com numeração diferente — ex.: "2.1.0" em vez de
+// "2.1.5" — nenhuma opção batia e o filtro sempre voltava vazio).
+// Rótulos amigáveis conhecidos (retrocompatibilidade visual); qualquer outro
+// prefixo aparece com a descrição da primeira conta encontrada daquele grupo.
+const TIPO_LABEL = {
+  '1.1.1':'Caixa e Bancos','1.1.2':'Aplicações Financeiras','1.1.3':'A Receber',
+  '1.1.4':'Outros Ativos Circ.','1.2.1':'Ativo Não Circulante','2.1.2':'Fornecedores',
+  '2.1.3':'Obrig. Trabalhistas','2.1.4':'Obrig. Tributárias','2.1.5':'Outras c/ Pagar',
+  '2.2.1':'Passivo Longo Prazo','2.2.4':'Outros Passivos'
+};
+function tiposDisponiveis(){
+  const set=new Set();
+  allData.forEach(t=>{
+    if(!t.conta_cod) return;
+    const seg=t.conta_cod.split('.');
+    if(seg.length>=3) set.add(seg.slice(0,3).join('.'));
+  });
+  return [...set].sort();
+}
+function popularTiposConta(){
+  const sel=document.getElementById('tf-tipo');
+  if(!sel) return;
+  const atual=sel.value;
+  const tipos=tiposDisponiveis();
+  sel.innerHTML='<option value="">Todos os tipos</option>'+tipos.map(p=>{
+    const t=allData.find(x=>x.conta_cod && x.conta_cod.startsWith(p));
+    const lbl=TIPO_LABEL[p] || (t?t.conta_desc:'') || p;
+    return `<option value="${p}">${lbl} (${p})</option>`;
+  }).join('');
+  // Mantém a seleção atual se ainda existir na nova lista; senão volta a "Todos".
+  sel.value = tipos.includes(atual) ? atual : '';
+}
+
+// ── CONTA CONTÁBIL — dropdown multi-seleção (checkboxes) ──────────────────
+function contaListaDisponivel(){
+  const tipo=document.getElementById('tf-tipo')?.value||'';
+  const c=[...new Set(allData.map(t=>t.conta_cod).filter(Boolean))].sort();
+  return tipo?c.filter(x=>x.startsWith(tipo)):c;
 }
 
 function syncConta(){
-  const tipo=document.getElementById('tf-tipo').value;
-  const c=[...new Set(allData.map(t=>t.conta_cod).filter(Boolean))].sort();
-  const fc=tipo?c.filter(x=>x.startsWith(tipo)):c;
-  document.getElementById('tf-conta').innerHTML='<option value="">Todas as contas</option>'+fc.map(c=>{const t=allData.find(x=>x.conta_cod===c);return`<option value="${c}">${c} — ${t?t.conta_desc:''}</option>`;}).join('');
+  // Mudou o "Tipo de Conta": a lista de contas disponíveis muda, então volta
+  // para "todas" dentro do novo recorte (evita ficar com seleção órfã).
+  _contasFiltro=null;
+  updateContaBtnLabel();
+  renderContaCheckboxes();
+}
+
+function toggleContaDropdown(open){
+  const dd=document.getElementById('tf-conta-dropdown');
+  if(!dd) return;
+  const show = open===undefined ? !dd.classList.contains('open') : open;
+  dd.classList.toggle('open', show);
+  if(show){ renderContaCheckboxes(); document.getElementById('tf-conta-busca').focus(); }
+}
+document.addEventListener('click', e=>{
+  const dd=document.getElementById('tf-conta-dropdown'), btn=document.getElementById('tf-conta-btn');
+  if(dd && dd.classList.contains('open') && !dd.contains(e.target) && e.target!==btn) dd.classList.remove('open');
+});
+
+function renderContaCheckboxes(){
+  const list=document.getElementById('tf-conta-list');
+  if(!list) return;
+  const contas=contaListaDisponivel();
+  list.innerHTML = contas.length ? contas.map(c=>{
+    const t=allData.find(x=>x.conta_cod===c);
+    const desc=t?t.conta_desc:'';
+    const checked=(_contasFiltro===null||_contasFiltro.has(c))?'checked':'';
+    return `<label class="tf-conta-item" title="${c} — ${String(desc).replace(/"/g,'&quot;')}">
+      <input type="checkbox" value="${c}" ${checked} onchange="contaToggle('${c}',this.checked)">
+      <span class="cod">${c}</span><span class="desc">${desc}</span>
+    </label>`;
+  }).join('') : '<div style="padding:8px;font-size:11px;color:var(--text3);">Nenhuma conta carregada</div>';
+  contaFiltrarBusca();
+  updateContaBtnLabel();
+}
+
+function contaFiltrarBusca(){
+  const q=(document.getElementById('tf-conta-busca')?.value||'').toLowerCase();
+  document.querySelectorAll('#tf-conta-list .tf-conta-item').forEach(lbl=>{
+    lbl.style.display = (!q || lbl.textContent.toLowerCase().includes(q)) ? '' : 'none';
+  });
+}
+
+function contaToggle(cod, checked){
+  if(_contasFiltro===null) _contasFiltro=new Set(contaListaDisponivel());
+  if(checked) _contasFiltro.add(cod); else _contasFiltro.delete(cod);
+  const disp=contaListaDisponivel();
+  if(disp.length && disp.every(x=>_contasFiltro.has(x))) _contasFiltro=null; // voltou a cobrir todas
+  updateContaBtnLabel();
+  tfAplicar();
+}
+
+function contaMarcarTodas(marcar){
+  _contasFiltro = marcar ? null : new Set();
+  document.querySelectorAll('#tf-conta-list input[type=checkbox]').forEach(cb=>{cb.checked=marcar;});
+  updateContaBtnLabel();
+  tfAplicar();
+}
+
+// Seleção única vinda de outro ponto da UI (ex.: clique na lista lateral de contas).
+function contaSelecionarUnica(cod){
+  _contasFiltro = new Set([cod]);
+  updateContaBtnLabel();
+}
+
+function getContaSelecionadaUnica(){
+  return (_contasFiltro!==null && _contasFiltro.size===1) ? [..._contasFiltro][0] : '';
+}
+
+function updateContaBtnLabel(){
+  const btn=document.getElementById('tf-conta-btn');
+  if(!btn) return;
+  let lbl;
+  if(_contasFiltro===null) lbl='Todas as contas';
+  else if(_contasFiltro.size===0) lbl='Nenhuma conta';
+  else if(_contasFiltro.size===1){
+    const c=[..._contasFiltro][0], t=allData.find(x=>x.conta_cod===c);
+    lbl=c+(t?' — '+t.conta_desc:'');
+  } else lbl=_contasFiltro.size+' contas selecionadas';
+  btn.textContent=lbl+' ▾';
+  btn.title=lbl;
 }
 
 function tfAplicar(){
-  const tipo=document.getElementById('tf-tipo').value,conta=document.getElementById('tf-conta').value;
+  const tipo=document.getElementById('tf-tipo').value;
   const filial=document.getElementById('tf-filial').value;
   const ini=document.getElementById('tf-ini').value,fim=document.getElementById('tf-fim').value;
   const dI=ini?new Date(ini):null,dF=fim?new Date(fim):null;
   filtData=allData.filter(t=>{
     if(dI&&t.data<dI)return false;if(dF&&t.data>dF)return false;
     if(tipo&&t.conta_cod&&!t.conta_cod.startsWith(tipo))return false;
-    if(conta&&t.conta_cod!==conta)return false;
+    if(_contasFiltro!==null&&!_contasFiltro.has(t.conta_cod))return false;
     if(filial&&t.filial!==filial)return false;
     return true;
   });
-  ['f-tipo','f-conta','f-filial','f-ini','f-fim'].forEach((id,i)=>{document.getElementById(id).value=[tipo,conta,filial,ini,fim][i];});
-  // Atualizar conta atual para o saldo de abertura
-  setContaAtual(conta);
+  // Saldo de abertura / saldo corrente só fazem sentido com EXATAMENTE 1 conta
+  // marcada — com 0, 2+ ou "todas", ficam desabilitados (igual a antes).
+  setContaAtual(getContaSelecionadaUnica());
   renderAll();renderTags();
 }
 
 function tfLimpar(){
-  ['tf-tipo','tf-conta','tf-filial'].forEach(id=>document.getElementById(id).value='');
-  syncConta();filtData=[...allData];setContaAtual('');popFilts();renderAll();renderTags();
+  document.getElementById('tf-tipo').value='';
+  document.getElementById('tf-filial').value='';
+  _contasFiltro=null;
+  updateContaBtnLabel();
+  renderContaCheckboxes();
+  filtData=[...allData];setContaAtual('');popFilts();renderAll();renderTags();
 }
 
 function renderTags(){
-  const tipo=document.getElementById('tf-tipo').value,conta=document.getElementById('tf-conta').value;
+  const tipo=document.getElementById('tf-tipo').value;
   const filial=document.getElementById('tf-filial').value,ini=document.getElementById('tf-ini').value,fim=document.getElementById('tf-fim').value;
   const tags=[];
   if(tipo)tags.push({l:'Tipo: '+document.getElementById('tf-tipo').options[document.getElementById('tf-tipo').selectedIndex].text,c:()=>{document.getElementById('tf-tipo').value='';syncConta();tfAplicar();}});
-  if(conta)tags.push({l:'Conta: '+conta,c:()=>{document.getElementById('tf-conta').value='';tfAplicar();}});
+  if(_contasFiltro!==null){
+    const n=_contasFiltro.size;
+    const lbl = n===0 ? 'Nenhuma conta selecionada' : n===1 ? 'Conta: '+[..._contasFiltro][0] : n+' contas selecionadas';
+    tags.push({l:lbl,c:()=>{_contasFiltro=null;updateContaBtnLabel();renderContaCheckboxes();tfAplicar();}});
+  }
   if(filial)tags.push({l:'Filial: '+filial,c:()=>{document.getElementById('tf-filial').value='';tfAplicar();}});
   if(ini||fim)tags.push({l:'Período: '+(ini||'…')+' → '+(fim||'…'),c:()=>{const d=allData.map(t=>t.data).filter(Boolean).sort((a,b)=>a-b);if(d.length){document.getElementById('tf-ini').value=d[0].toISOString().split('T')[0];document.getElementById('tf-fim').value=d[d.length-1].toISOString().split('T')[0];}tfAplicar();}});
   const row=document.getElementById('tagsrow');
@@ -1413,7 +2074,7 @@ function renderAccList(){
   sorted.slice(0,120).forEach(c=>{
     const div=document.createElement('div');div.className='acc-item';
     div.innerHTML=`<span class="acc-code">${c.cod}</span><span class="acc-name">${c.desc}</span>${c.open>0?`<span class="acc-bdg bdg-open">${c.open} aberto(s)</span>`:'<span class="acc-bdg bdg-ok">ok</span>'}`;
-    div.onclick=()=>{document.querySelectorAll('.acc-item').forEach(i=>i.classList.remove('active'));div.classList.add('active');document.getElementById('tf-conta').value=c.cod;document.getElementById('f-conta').value=c.cod;tfAplicar();};
+    div.onclick=()=>{document.querySelectorAll('.acc-item').forEach(i=>i.classList.remove('active'));div.classList.add('active');contaSelecionarUnica(c.cod);tfAplicar();};
     list.appendChild(div);
   });
 }
@@ -1433,13 +2094,23 @@ function renderResumo(){
     <div class="scard"><h3>Match NF / Recebimento</h3><div class="v success">${mPares.length} pares</div><div class="sv">${fBRL(mPares.reduce((s,p)=>s+p.vl_nf,0))}</div></div>
     <div class="scard"><h3>Em Aberto</h3><div class="v danger">${open.length} itens</div><div class="sv">${fBRL(open.reduce((s,t)=>s+(t.saldo_aberto||0),0))}</div></div>
     <div class="scard"><h3>Retenções (NF vs Rec.)</h3><div class="v ret">${rets.length} ocorr.</div><div class="sv">${fBRL(rets.reduce((s,t)=>s+t.ret_val,0))} retidos</div></div>
-    <div class="scard"><h3>Comp. Unificada (revisar)</h3><div class="v warn" style="color:#7a4a00">${unifs.length} itens</div><div class="sv">${fBRL(unifs.reduce((s,t)=>s+(t.debito||t.credito||0),0))} — ver aba Divergências</div></div>
+    <div class="scard"><h3>Comp. Unificada (revisar)</h3><div class="v warn" style="color:var(--unif)">${unifs.length} itens</div><div class="sv">${fBRL(unifs.reduce((s,t)=>s+(t.debito||t.credito||0),0))} — ver aba Divergências</div></div>
     <div class="scard"><h3>Saldos de Abertura</h3><div class="v warn">${Object.keys(saldosAbertura).length>0?Object.keys(saldosAbertura).length+' conta(s)':'Não informado'}</div><div class="sv">${Object.keys(saldosAbertura).length>0?'ref. 31/12/2025 — '+fBRL(Object.values(saldosAbertura).reduce((s,v)=>s+v,0)):'Informe no campo acima'}</div></div>`;
-  const gm={};open.forEach(t=>{const k=(t.conta_cod||'?').substring(0,5);if(!gm[k])gm[k]={n:0,v:0};gm[k].n++;gm[k].v+=(t.saldo_aberto||0);});
-  const gl={'1.1.2':'Aplic. Financeiras','1.1.3':'A Receber','2.1.2':'Fornecedores','2.1.3':'Obrig. Trabalhistas','2.1.4':'Obrig. Tributárias','2.1.5':'Outras c/ Pagar'};
-  let h='<table style="width:100%"><thead><tr><th>Grupo de Conta</th><th>Qtd. Em Aberto</th><th>Valor em Aberto</th></tr></thead><tbody>';
-  Object.entries(gm).sort((a,b)=>b[1].v-a[1].v).forEach(([k,v])=>{h+=`<tr><td><strong>${gl[k]||k}</strong> <span class="tag">${k}</span></td><td class="mo rt">${v.n}</td><td class="mo rt warn">${fBRL(v.v)}</td></tr>`;});
+  // Agrupar pela conta COMPLETA (não mais por prefixo de 5 chars): assim, se
+  // houver conta(s) marcada(s) no filtro de Conta Contábil, `open` já vem só
+  // delas; se estiver em "Todas as contas", aparece uma linha por conta com
+  // item em aberto.
+  const gm={};
+  open.forEach(t=>{
+    const k=t.conta_cod||'?';
+    if(!gm[k]) gm[k]={n:0,v:0,desc:t.conta_desc||''};
+    gm[k].n++; gm[k].v+=(t.saldo_aberto||0);
+  });
+  let h='<table style="width:100%"><thead><tr><th>Conta</th><th>Qtd. Em Aberto</th><th>Valor em Aberto</th></tr></thead><tbody>';
+  Object.entries(gm).sort((a,b)=>b[1].v-a[1].v).forEach(([k,v])=>{h+=`<tr><td><strong>${v.desc||'—'}</strong> <span class="tag">${k}</span></td><td class="mo rt">${v.n}</td><td class="mo rt warn">${fBRL(v.v)}</td></tr>`;});
   document.getElementById('stbl').innerHTML=h+'</tbody></table>';
+  // Mantém o detalhamento inline (se estiver aberto) sincronizado com o filtro atual.
+  if(_resumoAbertosVisivel) renderResumoAbertos();
 }
 
 // ── CONCILIAÇÃO ───────────────────────────────────────────────────────────
@@ -1468,7 +2139,7 @@ function renderConcil(){
       const sc = saldoCorrente < 0 ? 'color:var(--danger)' : 'color:var(--warn)';
       const natH = getNatureza(sr.conta);
       const isPassH = natH === 'passivo';
-      html += `<tr style="background:#fff3cd;font-weight:bold;border-left:4px solid #c47a00;">
+      html += `<tr style="background:var(--saldo-hdr-bg);font-weight:bold;border-left:4px solid var(--partial);">
         <td class="mo" style="color:var(--warn)">${sr.data_str}</td>
         <td class="mo" style="color:var(--warn)">—</td>
         <td style="color:var(--warn);font-size:12px" colspan="2">SALDO DE ABERTURA (${isPassH?'PASSIVO':'ATIVO'})</td>
@@ -1492,7 +2163,7 @@ function renderConcil(){
         : `<span class="sb sb-open">Em aberto</span>`;
       // Mostrar valor no lado correto
       const vlComp = sr.debito || sr.credito;
-      html += `<tr style="background:#fffbf0;border-left:4px solid #e8d88a;">
+      html += `<tr style="background:var(--saldo-bg);border-left:4px solid var(--saldo-border);">
         <td class="mo" style="font-size:10px;color:var(--text3)">${sr.data_str}</td>
         <td class="mo" style="color:var(--info);font-size:11px;font-weight:bold">${sr.nf}</td>
         <td style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" colspan="2">${sr.razao}</td>
@@ -1609,6 +2280,22 @@ function getItensAbertos(){
   return base;
 }
 
+// Linhas <tr> compartilhadas entre a aba "Em Aberto" e o detalhamento inline
+// da aba Resumo — evita duplicar o mesmo markup nos dois lugares.
+function abertosLinhasHTML(d){
+  return d.map(t=>`<tr class="r-open">
+    <td class="mo">${fDate(t.data)}</td>
+    <td class="mo" style="font-weight:bold;color:var(--info)">${t.nf||'—'}</td>
+    <td class="rcell">${t.razao_social||'—'}</td>
+    <td class="mo" style="font-size:10px">${t.conta_cod||''}</td>
+    <td class="hcell">${t.historico}</td>
+    <td class="rt mo deb">${t.debito>0?fBRL(t.debito):'—'}</td>
+    <td class="rt mo cred">${t.credito>0?fBRL(t.credito):'—'}</td>
+    <td class="rt mo warn">${fBRL(t.saldo_aberto||t.debito||t.credito)}</td>
+    <td>${sBadge(t)}</td>
+  </tr>`).join('');
+}
+
 function renderAbertos(){
   const d = getItensAbertos();
   const tb = document.getElementById('tb-abertos');
@@ -1620,17 +2307,7 @@ function renderAbertos(){
   // Totalizador no rodapé
   const totalAberto = d.reduce((s,t)=>s+(t.saldo_aberto||t.debito||0),0);
 
-  tb.innerHTML = d.slice(0,1000).map(t=>`<tr class="r-open">
-    <td class="mo">${fDate(t.data)}</td>
-    <td class="mo" style="font-weight:bold;color:var(--info)">${t.nf||'—'}</td>
-    <td class="rcell">${t.razao_social||'—'}</td>
-    <td class="mo" style="font-size:10px">${t.conta_cod||''}</td>
-    <td class="hcell">${t.historico}</td>
-    <td class="rt mo deb">${t.debito>0?fBRL(t.debito):'—'}</td>
-    <td class="rt mo cred">${t.credito>0?fBRL(t.credito):'—'}</td>
-    <td class="rt mo warn">${fBRL(t.saldo_aberto||t.debito||t.credito)}</td>
-    <td>${sBadge(t)}</td>
-  </tr>`).join('') +
+  tb.innerHTML = abertosLinhasHTML(d.slice(0,1000)) +
   `<tr style="background:var(--surface2);font-weight:bold;border-top:2px solid var(--border);">
     <td colspan="7" style="text-align:right;font-size:11px;color:var(--text2);padding:8px 9px;">TOTAL EM ABERTO</td>
     <td class="rt mo warn" style="font-size:13px;">${fBRL(totalAberto)}</td>
@@ -1640,20 +2317,48 @@ function renderAbertos(){
   if(d.length>1000) tb.innerHTML+=`<tr><td colspan="9" style="text-align:center;font-size:11px;color:var(--text3);padding:.5rem">Exibindo 1000 de ${d.length}.</td></tr>`;
 }
 
+// ── RESUMO: detalhamento inline de itens em aberto (opcional, sem trocar aba) ─
+function toggleResumoAbertos(){
+  _resumoAbertosVisivel = !_resumoAbertosVisivel;
+  const wrap = document.getElementById('resumo-abertos-wrap');
+  const btn  = document.getElementById('resumo-toggle-abertos');
+  if(wrap) wrap.style.display = _resumoAbertosVisivel ? '' : 'none';
+  if(btn)  btn.textContent = _resumoAbertosVisivel ? '🙈 Ocultar itens em aberto' : '👁 Mostrar itens em aberto';
+  if(_resumoAbertosVisivel) renderResumoAbertos();
+}
+
+function renderResumoAbertos(){
+  const tb = document.getElementById('tb-resumo-abertos');
+  if(!tb) return;
+  const d = getItensAbertos();
+  if(!d.length){
+    tb.innerHTML='<tr><td colspan="9" style="text-align:center;padding:1.4rem;color:var(--text3)">Nenhum item em aberto no filtro atual.</td></tr>';
+    return;
+  }
+  tb.innerHTML = abertosLinhasHTML(d.slice(0,1000));
+  if(d.length>1000) tb.innerHTML+=`<tr><td colspan="9" style="text-align:center;font-size:11px;color:var(--text3);padding:.5rem">Exibindo 1000 de ${d.length}.</td></tr>`;
+}
+
 // ── RETENÇÕES ─────────────────────────────────────────────────────────────
-function renderRet(){
-  // Filtrar retenções apenas das contas/período presentes no filtData atual
+// Retenções visíveis no filtro atual — usada pela tela (renderRet) e pela
+// exportação da aba Retenções (mesma fonte, evita os dois ficarem diferentes).
+function getRetencoesPares(){
   const contasVisiveis = new Set(filtData.map(t=>t.conta_cod).filter(Boolean));
   const datasVisiveis  = filtData.map(t=>t.data).filter(Boolean);
-  const dtMin = datasVisiveis.length ? new Date(Math.min(...datasVisiveis)) : null;
-  const dtMax = datasVisiveis.length ? new Date(Math.max(...datasVisiveis)) : null;
-
-  const rp = pares.filter(p =>
+  // Usar reduce (não Math.min/max com spread) — com muitos lançamentos o
+  // spread excede o limite de argumentos do motor JS e estoura a pilha.
+  const dtMin = datasVisiveis.length ? datasVisiveis.reduce((a,b)=>a<b?a:b) : null;
+  const dtMax = datasVisiveis.length ? datasVisiveis.reduce((a,b)=>a>b?a:b) : null;
+  return pares.filter(p =>
     p.tipo === 'ret' &&
     contasVisiveis.has(p.conta) &&
     (!dtMin || p.data_nf >= dtMin) &&
     (!dtMax || p.data_nf <= dtMax)
   );
+}
+
+function renderRet(){
+  const rp = getRetencoesPares();
   const tb=document.getElementById('tb-ret');
   if(!rp.length){tb.innerHTML='<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--text3)">Nenhuma retenção identificada.</td></tr>';return;}
   tb.innerHTML=rp.map(p=>`<tr class="r-ret">
@@ -1690,11 +2395,30 @@ function renderRazao(){
 }
 
 // ── POR CONTA ─────────────────────────────────────────────────────────────
-function renderContas(){
+// Agregação "Por Conta" visível no filtro atual — usada pela tela
+// (renderContas) e pela exportação da aba (mesma fonte).
+function buildContasResumo(){
   const cm={};
   filtData.forEach(t=>{const k=t.conta_cod;if(!k)return;if(!cm[k])cm[k]={cod:k,desc:t.conta_desc,n:0,deb:0,cred:0,open:0,vo:0,ret:0,vr:0,is_ctrl:t.is_open_account};cm[k].n++;cm[k].deb+=t.debito;cm[k].cred+=t.credito;if(t.is_open_account&&(t.status==='open'||t.status==='partial')){cm[k].open++;cm[k].vo+=(t.saldo_aberto||0);}if(t.status==='ret'&&t.debito>0){cm[k].ret++;cm[k].vr+=t.ret_val;}});
-  const tp=cod=>{if(!cod)return'';if(cod.startsWith('1.1.2'))return'<span class="tag r">Aplicação</span>';if(cod.startsWith('1.1.3'))return'<span class="tag r">A Receber</span>';if(cod.startsWith('2.1'))return'<span class="tag p">A Pagar</span>';if(cod.startsWith('1.1.1'))return'<span class="tag">Banco</span>';return'<span class="tag">Outro</span>';};
-  document.getElementById('tb-contas').innerHTML=Object.values(cm).sort((a,b)=>b.vo-a.vo).map(c=>`<tr>
+  return Object.values(cm).sort((a,b)=>b.vo-a.vo);
+}
+function contaTipoLabel(cod){
+  if(!cod)return'';
+  if(cod.startsWith('1.1.2'))return'Aplicação';
+  if(cod.startsWith('1.1.3'))return'A Receber';
+  if(cod.startsWith('2.1'))return'A Pagar';
+  if(cod.startsWith('1.1.1'))return'Banco';
+  return'Outro';
+}
+function contaTipoBadgeClass(cod){
+  if(!cod)return'';
+  if(cod.startsWith('1.1.2')||cod.startsWith('1.1.3'))return'r';
+  if(cod.startsWith('2.1'))return'p';
+  return'';
+}
+function renderContas(){
+  const tp=cod=>{const l=contaTipoLabel(cod);if(!l)return'';const c=contaTipoBadgeClass(cod);return`<span class="tag${c?' '+c:''}">${l}</span>`;};
+  document.getElementById('tb-contas').innerHTML=buildContasResumo().map(c=>`<tr>
     <td class="mo" style="font-size:10px">${c.cod}</td><td style="font-size:11px">${c.desc}</td><td>${tp(c.cod)}</td>
     <td class="mo rt">${c.n}</td>
     <td class="mo rt deb">${fBRL(c.deb)}</td>
@@ -1709,10 +2433,12 @@ function renderContas(){
 }
 
 // ── SHOW PANEL ────────────────────────────────────────────────────────────
+let _abaAtual='resumo';
 function showP(n){
-  const ps=['resumo','concil','abertos','ret','razao','contas','resultado','diverg','validfin'];
+  const ps=['resumo','concil','abertos','ret','razao','contas','resultado','diverg','validfin','tribut'];
   ps.forEach(p=>{const el=document.getElementById('panel-'+p);if(el)el.style.display=p===n?'':('none');});
   document.querySelectorAll('.ptab').forEach((t,i)=>t.classList.toggle('active',ps[i]===n));
+  _abaAtual=n;
 }
 
 // ── SORT ─────────────────────────────────────────────────────────────────
@@ -1724,7 +2450,48 @@ function sc(tbl,col){
 }
 
 // ── EXPORT ────────────────────────────────────────────────────────────────
+function baixarCSV(conteudo,nome){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['﻿'+conteudo],{type:'text/csv;charset=utf-8'}));
+  a.download=nome;a.click();
+}
+
+// Exporta a aba ATUALMENTE ABERTA (_abaAtual) com as mesmas colunas que
+// aparecem na tela — antes os botões CSV/Excel do topo sempre exportavam o
+// layout de Conciliação, mesmo estando em Razão Completo/Em Aberto/etc.
 function expCSV(){
+  if(_abaAtual==='razao'){
+    const d=getVD();
+    const h='Data,Lote/Doc,Nº NF,Razão Social,Conta,Histórico,Filial,Débito,Crédito,Saldo,Status\n';
+    const r=d.map(t=>[fDate(t.data),t.lote_doc,t.nf,'"'+(t.razao_social||'')+'"',t.conta_cod,'"'+(t.historico||'').replace(/"/g,'""')+'"',t.filial||'',t.debito.toFixed(2),t.credito.toFixed(2),'"'+(t.saldo_str||'')+'"',t.status].join(',')).join('\n');
+    baixarCSV(h+r,'razao_completo.csv');
+    return;
+  }
+  if(_abaAtual==='abertos'){
+    const d=getItensAbertos();
+    const h='Data,NF/Doc,Razão Social,Conta,Histórico,Débito,Crédito,Saldo Aberto,Status\n';
+    const r=d.map(t=>[fDate(t.data),t.nf||'—','"'+(t.razao_social||'')+'"',t.conta_cod,'"'+(t.historico||'').replace(/"/g,'""')+'"',t.debito.toFixed(2),t.credito.toFixed(2),(t.saldo_aberto||t.debito||t.credito||0).toFixed(2),t.status].join(',')).join('\n');
+    baixarCSV(h+r,'em_aberto.csv');
+    return;
+  }
+  if(_abaAtual==='ret'){
+    const rp=getRetencoesPares();
+    const h='Data NF,Data Rec.,Nº NF,Razão Social,Conta,Vl. NF,Vl. Recebido,Vl. Retido,% Retenção\n';
+    const r=rp.map(p=>[fDate(p.data_nf),fDate(p.data_rec),p.nf_num,'"'+(p.razao||'')+'"',p.conta,p.vl_nf.toFixed(2),p.vl_rec.toFixed(2),p.diferenca.toFixed(2),p.pct.toFixed(2)+'%'].join(',')).join('\n');
+    baixarCSV(h+r,'retencoes.csv');
+    return;
+  }
+  if(_abaAtual==='contas'){
+    const cm=buildContasResumo();
+    const h='Código,Descrição,Tipo,Lanç.,Total Déb.,Total Créd.,Saldo Líq.,Em Aberto,Vl. Aberto,Retenções,Vl. Retido,Status\n';
+    const r=cm.map(c=>[c.cod,'"'+(c.desc||'')+'"',contaTipoLabel(c.cod),c.n,c.deb.toFixed(2),c.cred.toFixed(2),(c.deb-c.cred).toFixed(2),c.open,c.vo.toFixed(2),c.ret,c.vr.toFixed(2),c.open>0?'Pendências':(c.is_ctrl?'OK':'N/A')].join(',')).join('\n');
+    baixarCSV(h+r,'por_conta.csv');
+    return;
+  }
+  expCSVConciliacao();
+}
+
+function expCSVConciliacao(){
   const d=getVD();
   const h='Data,NF,Razão Social,Conta,Histórico,Débito,Crédito,Saldo Aberto,Status\n';
   const r=d.map(t=>[fDate(t.data),t.nf,'"'+t.razao_social+'"',t.conta_cod,'"'+t.historico.replace(/"/g,'""')+'"',t.debito.toFixed(2),t.credito.toFixed(2),(t.saldo_aberto||0).toFixed(2),t.status].join(',')).join('\n');
@@ -1732,6 +2499,48 @@ function expCSV(){
 }
 
 function expXLSX(){
+  if(_abaAtual==='razao'){
+    const d=getVD();
+    const data=[['Data','Lote/Doc','Nº NF','Razão Social','Conta','Histórico','Filial','Débito','Crédito','Saldo','Status']];
+    d.forEach(t=>data.push([fDate(t.data),t.lote_doc,t.nf,t.razao_social,t.conta_cod,t.historico,t.filial,t.debito,t.credito,t.saldo_str,t.status]));
+    const wb1=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb1,XLSX.utils.aoa_to_sheet(data),'Razão Completo');
+    XLSX.writeFile(wb1,'razao_completo.xlsx');
+    return;
+  }
+  if(_abaAtual==='abertos'){
+    const op=getItensAbertos();
+    const data=[['Data','NF/Doc','Razão Social','Conta','Histórico','Débito','Crédito','Saldo Aberto','Status']];
+    op.forEach(t=>data.push([fDate(t.data),t.nf||'—',t.razao_social||'—',t.conta_cod,t.historico,t.debito,t.credito,t.saldo_aberto||t.debito||t.credito||0,t.status]));
+    const totalAb=op.reduce((s,t)=>s+(t.saldo_aberto||t.debito||0),0);
+    data.push(['','','','','','','TOTAL',totalAb,'']);
+    const wb1=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb1,XLSX.utils.aoa_to_sheet(data),'Em Aberto');
+    XLSX.writeFile(wb1,'em_aberto.xlsx');
+    return;
+  }
+  if(_abaAtual==='ret'){
+    const rp=getRetencoesPares();
+    const data=[['Data NF','Data Rec.','Nº NF','Razão Social','Conta','Vl. NF','Vl. Recebido','Vl. Retido','% Retenção']];
+    rp.forEach(p=>data.push([fDate(p.data_nf),fDate(p.data_rec),p.nf_num,p.razao,p.conta,p.vl_nf,p.vl_rec,p.diferenca,p.pct.toFixed(2)+'%']));
+    const wb1=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb1,XLSX.utils.aoa_to_sheet(data),'Retenções');
+    XLSX.writeFile(wb1,'retencoes.xlsx');
+    return;
+  }
+  if(_abaAtual==='contas'){
+    const cm=buildContasResumo();
+    const data=[['Código','Descrição','Tipo','Lanç.','Total Déb.','Total Créd.','Saldo Líq.','Em Aberto','Vl. Aberto','Retenções','Vl. Retido','Status']];
+    cm.forEach(c=>data.push([c.cod,c.desc,contaTipoLabel(c.cod),c.n,c.deb,c.cred,c.deb-c.cred,c.open,c.vo,c.ret,c.vr,c.open>0?'Pendências':(c.is_ctrl?'OK':'N/A')]));
+    const wb1=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb1,XLSX.utils.aoa_to_sheet(data),'Por Conta');
+    XLSX.writeFile(wb1,'por_conta.xlsx');
+    return;
+  }
+  expXLSXConciliacao();
+}
+
+function expXLSXConciliacao(){
   const wb=XLSX.utils.book_new();
   // Conciliação com saldo de abertura e saldo corrente
   const d=getVD();
@@ -2091,7 +2900,9 @@ function renderResultado(){
     return '<span class="sb sb-na">—</span>';
   };
 
-  tb.innerHTML = rows.map(r => `<tr class="r-open">
+  // Limitar a tabela (igual às demais abas) — os cards de totais acima já
+  // usam `rows` por completo, só a listagem é cortada para não pesar o DOM.
+  tb.innerHTML = rows.slice(0,1000).map(r => `<tr class="r-open">
     <td class="mo">${fDate(r.data)}</td>
     <td class="mo" style="font-weight:bold;color:var(--info)">${r.nf}</td>
     <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px">${r.razao}</td>
@@ -2102,6 +2913,7 @@ function renderResultado(){
     <td>${sbadge(r.status)}</td>
     <td style="font-size:10px;color:var(--text3)">${r.obs}</td>
   </tr>`).join('');
+  if(rows.length>1000) tb.innerHTML+=`<tr><td colspan="9" style="text-align:center;font-size:11px;color:var(--text3);padding:.5rem">Exibindo 1000 de ${rows.length}. Use filtros para refinar.</td></tr>`;
 }
 
 function scRes(col){
@@ -2198,8 +3010,8 @@ function renderDiverg(){
     ['Valor créditos divergentes', fBRL(vlCredSem), 'var(--danger)'],
     ['Débitos closed s/ recebimento', debClosed.length, 'var(--warn)'],
     ['Valor débitos divergentes', fBRL(vlDebClosed), 'var(--warn)'],
-    ['Comp. Unificada (revisar)', compUnif.length, '#7a4a00'],
-    ['Valor Comp. Unificada', fBRL(vlCompUnif), '#7a4a00'],
+    ['Comp. Unificada (revisar)', compUnif.length, 'var(--unif)'],
+    ['Valor Comp. Unificada', fBRL(vlCompUnif), 'var(--unif)'],
   ].map(([l,v,cor])=>`<div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:.6rem 1rem;min-width:160px;">
     <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3)">${l}</div>
     <div style="font-size:17px;font-family:var(--mono);color:${cor}">${v}</div>
@@ -2213,7 +3025,10 @@ function renderDiverg(){
   const divRowCls = t => t._divtipo==='Comp. Unificada' ? 'r-unif' : (t.credito>0?'r-ant':'r-open');
   const divBadgeCls = t => t._divtipo==='Comp. Unificada' ? 'sb-unif' : (t.credito>0?'sb-ant':'sb-partial');
 
-  tb.innerHTML = items.map(t=>`<tr class="${divRowCls(t)}">
+  // Limitar como nas demais abas — sem isso, um razão grande com muitos
+  // lançamentos sem NF reconhecida gera uma tabela enorme de uma vez só e
+  // deixa a página pesada/sem resposta (sem chegar a dar erro).
+  tb.innerHTML = items.slice(0,1000).map(t=>`<tr class="${divRowCls(t)}">
     <td class="mo">${fDate(t.data)}</td>
     <td class="mo" style="font-weight:bold;color:var(--info)">${t.nf||'—'}</td>
     <td class="rcell">${t.razao_social||'—'}</td>
@@ -2224,6 +3039,7 @@ function renderDiverg(){
     <td><span class="sb ${divBadgeCls(t)}" style="white-space:nowrap">${t._divtipo}</span></td>
     <td style="font-size:10px;color:var(--text2)">${t._divsit}</td>
   </tr>`).join('');
+  if(items.length>1000) tb.innerHTML+=`<tr><td colspan="9" style="text-align:center;font-size:11px;color:var(--text3);padding:.5rem">Exibindo 1000 de ${items.length}. Use filtros para refinar.</td></tr>`;
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -2523,7 +3339,7 @@ function renderValidFin() {
     diverg:   '<span class="sb sb-diverg">✗ Divergente</span>',
   };
 
-  tb.innerHTML = rows.map(r => `<tr class="${r.rowClass}">
+  tb.innerHTML = rows.slice(0,1000).map(r => `<tr class="${r.rowClass}">
     <td class="mo" style="font-weight:bold;color:var(--info)">${r.nf}</td>
     <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px">${r.nome}</td>
     <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:var(--text3);font-family:var(--mono)">${r.contas||'—'}</td>
@@ -2537,6 +3353,7 @@ function renderValidFin() {
     <td>${sbMap[r.situacao]||''}</td>
     <td style="font-size:10px;color:var(--text3);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||''}</td>
   </tr>`).join('');
+  if(rows.length>1000) tb.innerHTML+=`<tr><td colspan="12" style="text-align:center;font-size:11px;color:var(--text3);padding:.5rem">Exibindo 1000 de ${rows.length}. Use os filtros para refinar.</td></tr>`;
 }
 
 function expValidFin() {
@@ -2737,7 +3554,480 @@ function vfFiltrarCheckboxes() {
   });
 }
 
+// ── IRPJ / CSLL — LUCRO REAL ANUAL ───────────────────────────────────────
+
+// Converte célula da planilha para número (retorna null se vazio/inválido)
+function toNumT(v){
+  if(v===''||v===null||v===undefined) return null;
+  if(typeof v==='number') return isFinite(v)?v:null;
+  const s=String(v).replace(/\s/g,'').replace(/\./g,'').replace(',','.');
+  const n=parseFloat(s);
+  return isFinite(n)?n:null;
+}
+
+// Formata valor em R$ para exibição
+function fmtTribR(v){
+  if(v===null||v===undefined||!isFinite(v)) return '—';
+  const abs=Math.abs(v);
+  const fmt=abs.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  return (v<0?'(':'')+'R$ '+fmt+(v<0?')':'');
+}
+
+// Normaliza texto para comparação (sem acento, minúsculo)
+function normT(s){
+  s=String(s||'').toLowerCase().normalize('NFD');
+  let out='';
+  for(let i=0;i<s.length;i++){
+    const cc=s.codePointAt(i);
+    if(cc<0x0300||cc>0x036f) out+=s[i];
+  }
+  return out.trim();
+}
+
+// Parser da planilha ANUAL ────────────────────────────────────────────────
+// Recebe worksheet SheetJS; retorna {meses, itens}
+// itens: [{conta, label, valores:{mesLabel:num|null}, isHeader}]
+function parseTributario(ws){
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''});
+  if(!rows.length) return {meses:[],itens:[]};
+
+  const MESES_PT=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  const isMesCell=c=>{
+    const n=normT(c);
+    return MESES_PT.some(m=>n.startsWith(m)||n.includes(m+'/'));
+  };
+
+  // 1. Detectar linha de cabeçalho de meses (cols C+ com labels tipo "Jan/26")
+  let headerRowIdx=-1;
+  let colMeses={};
+  for(let r=0;r<Math.min(15,rows.length);r++){
+    const row=rows[r];
+    const map={};
+    for(let c=2;c<row.length;c++){
+      if(row[c]!==''&&isMesCell(String(row[c]))) map[c]=String(row[c]).trim();
+    }
+    if(Object.keys(map).length>=1){headerRowIdx=r;colMeses=map;break;}
+  }
+
+  // Fallback: sem linha de cabeçalho — gera labels Jan/26…Dez/26
+  if(headerRowIdx<0||!Object.keys(colMeses).length){
+    const LBL=['Jan/26','Fev/26','Mar/26','Abr/26','Mai/26','Jun/26','Jul/26','Ago/26','Set/26','Out/26','Nov/26','Dez/26'];
+    const maxC=rows.reduce((m,r)=>Math.max(m,r.length),0);
+    for(let c=2;c<Math.min(maxC,14);c++) colMeses[c]=LBL[c-2]||'M'+(c-1);
+    headerRowIdx=0;
+  }
+
+  const colIdx=Object.keys(colMeses).map(Number).sort((a,b)=>a-b);
+  const meses=colIdx.map(c=>colMeses[c]);
+
+  // 2. Processar linhas de dados (abaixo do cabeçalho)
+  const itens=[];
+  for(let r=headerRowIdx+1;r<rows.length;r++){
+    const row=rows[r];
+    const conta=String(row[0]||'').trim();
+    const label=String(row[1]||'').trim();
+    if(!label) continue;
+
+    const valores={};
+    colIdx.forEach((c,i)=>{ valores[meses[i]]=toNumT(row[c]); });
+
+    const hasValues=colIdx.some(c=>toNumT(row[c])!==null);
+    const isHeader=!hasValues;
+
+    itens.push({conta,label,valores,isHeader});
+  }
+
+  return {meses,itens};
+}
+
+// Upload da planilha ANUAL ────────────────────────────────────────────────
+async function loadTributario(file){
+  if(!file) return;
+  try{
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    const wsName=wb.SheetNames.find(n=>n.trim().toUpperCase()==='ANUAL')||wb.SheetNames[0];
+    const ws=wb.Sheets[wsName];
+    const result=parseTributario(ws);
+    tributData=result.itens;
+    tributMeses=result.meses;
+    tributMesAtivo=tributMeses[0]||null;
+    document.getElementById('trib-filename').textContent='📊 '+file.name+' · aba: '+wsName+' · '+tributMeses.length+' mês(es)';
+    renderTribut();
+  }catch(e){
+    alert('Erro ao ler a planilha:\n'+e.message);
+  }
+}
+
+// Busca item por palavras-chave no label (normalizado) ────────────────────
+function findTribItem(kws){
+  return tributData.find(it=>!it.isHeader&&kws.every(k=>normT(it.label).includes(normT(k))))||null;
+}
+
+// Render da aba IRPJ/CSLL ─────────────────────────────────────────────────
+function renderTribut(){
+  if(!document.getElementById('panel-tribut')) return;
+
+  if(!tributData.length||!tributMesAtivo){
+    document.getElementById('trib-content').style.display='none';
+    document.getElementById('trib-empty').style.display='';
+    return;
+  }
+  document.getElementById('trib-empty').style.display='none';
+  document.getElementById('trib-content').style.display='';
+
+  // Botões de mês
+  document.getElementById('trib-mes-bar').innerHTML=tributMeses.map(m=>
+    '<button class="ptab'+(m===tributMesAtivo?' active':'')+'" onclick="tributSetMes(\''+m+'\')">'+m+'</button>'
+  ).join('');
+
+  const mes=tributMesAtivo;
+
+  // Detectar linhas-chave para os cards de resumo
+  // Procura pela linha de CSLL final e IRPJ final
+  const csllFinal=findTribItem(['csll','final'])||findTribItem(['csll','a pagar'])||findTribItem(['final','csll'])||findTribItem(['valor','csll']);
+  const irpjFinal=findTribItem(['irpj','final'])||findTribItem(['irpj','a pagar'])||findTribItem(['final','irpj'])||findTribItem(['valor','irpj']);
+  const baseCsll =findTribItem(['base','csll'])||findTribItem(['calculo','csll']);
+  const baseIrpj =findTribItem(['base','irpj'])||findTribItem(['calculo','irpj']);
+
+  document.getElementById('trib-card-csll').textContent=csllFinal?fmtTribR(csllFinal.valores[mes]):'—';
+  document.getElementById('trib-card-irpj').textContent=irpjFinal?fmtTribR(irpjFinal.valores[mes]):'—';
+  document.getElementById('trib-card-bcsll').textContent=baseCsll?fmtTribR(baseCsll.valores[mes]):'—';
+  document.getElementById('trib-card-birpj').textContent=baseIrpj?fmtTribR(baseIrpj.valores[mes]):'—';
+
+  // Tabela principal
+  const isKeyRow=lbl=>/final|a pagar|valor\s*final|devid|valor\s*devido/i.test(lbl);
+  document.getElementById('trib-tbody').innerHTML=tributData.map(it=>{
+    const v=it.valores[mes];
+    const st=it.isHeader?'background:var(--surface2);font-weight:bold;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);':
+              isKeyRow(it.label)?'background:var(--key-row-bg);font-weight:bold;':'';
+    return '<tr style="'+st+'">'+
+      '<td style="font-size:11px;color:var(--text2);">'+(it.conta||'')+'</td>'+
+      '<td>'+(it.isHeader?'<strong>'+it.label+'</strong>':it.label)+'</td>'+
+      '<td style="text-align:right;">'+(v!==null?fmtTribR(v):'')+'</td>'+
+      '</tr>';
+  }).join('');
+}
+
+function tributSetMes(mes){
+  tributMesAtivo=mes;
+  renderTribut();
+}
+
+// Export IRPJ/CSLL ─────────────────────────────────────────────────────────
+function expTributCSV(){
+  if(!tributData.length) return;
+  const hdr=['Conta','Descrição',...tributMeses].join(';');
+  const linhas=tributData.map(it=>
+    [it.conta,it.label,...tributMeses.map(m=>{
+      const v=it.valores[m];
+      return v!==null?String(v).replace('.',','):'';
+    })].join(';')
+  );
+  const csv='﻿'+hdr+'\n'+linhas.join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download='irpj_csll_apuracao.csv';
+  a.click();
+}
+
+function expTributXLSX(){
+  if(!tributData.length) return;
+  const wb=XLSX.utils.book_new();
+  const wsData=[
+    ['Conta','Descrição',...tributMeses],
+    ...tributData.map(it=>[
+      it.conta,it.label,
+      ...tributMeses.map(m=>it.valores[m]!==null?it.valores[m]:'')
+    ])
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(wsData);
+  // Formata colunas de valores como moeda
+  const range=XLSX.utils.decode_range(ws['!ref']||'A1');
+  for(let c=2;c<=range.e.c;c++){
+    for(let r=1;r<=range.e.r;r++){
+      const cell=ws[XLSX.utils.encode_cell({r,c})];
+      if(cell&&typeof cell.v==='number') cell.z='R$ #,##0.00';
+    }
+  }
+  XLSX.utils.book_append_sheet(wb,ws,'IRPJ-CSLL');
+  XLSX.writeFile(wb,'irpj_csll_apuracao.xlsx');
+}
+
+// ── INICIALIZAÇÃO ─────────────────────────────────────────────────────────
+// Abre o banco local, popula o seletor de empresas e restaura a última
+// empresa utilizada (localStorage), carregando seus períodos acumulados.
+(async function initApp(){
+  try{
+    await popularEmpresas(localStorage.getItem('cc_ultima_empresa')||'');
+  }catch(err){
+    dbErr(err);
+  }
+})();
+
+// ════════════════════════════════════════════════════════════════════════
+// SALDOS DE ABERTURA EM LOTE  (grade editável + importar balancete + zerar)
+// ════════════════════════════════════════════════════════════════════════
+let _loteVals = {};     // {conta_cod: stringDigitada}
+let _loteImport = null; // {headers:[], rows:[[]]}
+
+function loteNorm(s){ return String(s==null?'':s).replace(/\D/g,''); }
+
+// Aceita "1.234,56", "1234,56", "1234.56", "1234", "(1.234,56)", "R$ 1.234,56"
+function parseSaldoNum(s){
+  if(typeof s === 'number') return s;
+  s = String(s==null?'':s).trim().replace(/\s/g,'').replace(/r\$/i,'');
+  if(s==='') return NaN;
+  let neg=false;
+  if(/^\(.*\)$/.test(s)){ neg=true; s=s.slice(1,-1); }
+  if(s.startsWith('-')){ neg=true; s=s.slice(1); }
+  if(s.includes(',')){
+    s = s.replace(/\./g,'').replace(',','.');     // BR: ponto=milhar, vírgula=decimal
+  } else if(/^\d{1,3}(\.\d{3})+$/.test(s)){
+    s = s.replace(/\./g,'');                       // só pontos de milhar (ex.: 1.234 / 886.015)
+  }                                                // senão: ponto é decimal (ex.: 886015.17)
+  const v = parseFloat(s);
+  if(isNaN(v)) return NaN;
+  return neg ? -v : v;
+}
+
+function abrirSaldosLote(){
+  if(!allData.length){ alert('Carregue o razão analítico primeiro.'); return; }
+  _loteImport = null;
+  _loteVals = {};
+  Object.entries(saldosAbertura).forEach(([c,v])=>{ _loteVals[c] = String(v); });
+  const mp = document.getElementById('lote-map'); if(mp) mp.style.display='none';
+  const bs = document.getElementById('lote-busca'); if(bs) bs.value='';
+  loteRenderGrid();
+  document.getElementById('lote-overlay').style.display='flex';
+}
+function fecharSaldosLote(){ document.getElementById('lote-overlay').style.display='none'; }
+
+function loteContas(){ return [...new Set(allData.map(t=>t.conta_cod).filter(Boolean))].sort(); }
+
+function loteRenderGrid(){
+  const q = (document.getElementById('lote-busca').value||'').toLowerCase();
+  const meta = {};
+  allData.forEach(t=>{ if(t.conta_cod && !meta[t.conta_cod]) meta[t.conta_cod] = t.conta_desc||''; });
+  const contas = loteContas();
+  let shown = 0;
+  const html = contas.filter(c=>{
+    const d=(meta[c]||'').toLowerCase();
+    return !q || c.toLowerCase().includes(q) || d.includes(q);
+  }).map(c=>{
+    shown++;
+    const passivo = getNatureza(c)==='passivo';
+    const val = _loteVals[c]!==undefined ? _loteVals[c] : '';
+    return `<tr>
+      <td class="lc">${c}</td>
+      <td class="ld">${meta[c]||''}</td>
+      <td><span class="lnat ${passivo?'np':'na2'}">${passivo?'Passivo':'Ativo'}</span></td>
+      <td style="text-align:right"><input type="text" class="lote-inp" data-conta="${c}" value="${String(val).replace(/"/g,'&quot;')}" placeholder="—" oninput="_loteVals[this.dataset.conta]=this.value"></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('lote-tb').innerHTML = html || '<tr><td colspan="4" style="text-align:center;color:var(--text3);padding:22px">Nenhuma conta encontrada.</td></tr>';
+  document.getElementById('lote-count').textContent = shown + ' de ' + contas.length + ' contas';
+}
+
+function loteSyncVisible(){
+  document.querySelectorAll('#lote-tb .lote-inp').forEach(i=>{ _loteVals[i.dataset.conta] = i.value; });
+}
+
+function loteZerarTodos(){
+  loteContas().forEach(c=> _loteVals[c]='0');
+  loteRenderGrid();
+}
+function loteLimparTodos(){ _loteVals = {}; loteRenderGrid(); }
+
+// ── Importação de balancete (xlsx/csv) com detecção de colunas ──────────────
+function loteImportBalancete(input){
+  const file = input.files[0]; if(!file) return;
+  const isCsv = /\.csv$/i.test(file.name);
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      let headers=[], rows=[];
+      if(isCsv){
+        const lines = String(e.target.result).split(/\r?\n/).filter(l=>l.trim());
+        if(!lines.length){ alert('Arquivo vazio.'); return; }
+        const sep = lines[0].includes(';') ? ';' : ',';
+        const split = l => l.split(sep).map(c=>c.replace(/^"|"$/g,'').trim());
+        headers = split(lines[0]);
+        rows = lines.slice(1).map(split);
+      } else {
+        const wb = XLSX.read(e.target.result, {type:'array', cellDates:false});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+        if(!aoa.length){ alert('Planilha vazia.'); return; }
+        // Localizar a linha de cabeçalho (1ª linha com >=2 células e algum texto)
+        let hi = 0;
+        for(let i=0;i<Math.min(aoa.length,20);i++){
+          const ne = aoa[i].filter(c=>String(c).trim()!=='').length;
+          const txt = aoa[i].some(c=>/[A-Za-zÀ-ÿ]/.test(String(c)));
+          if(ne>=2 && txt){ hi=i; break; }
+        }
+        headers = aoa[hi].map(c=>String(c).trim());
+        rows = aoa.slice(hi+1);
+      }
+      _loteImport = { headers, rows };
+      loteBuildMapUI(loteGuessAccCol(headers,rows), loteGuessValCol(headers));
+      loteRemap();
+    }catch(err){ alert('Falha ao ler o arquivo: '+err.message); }
+  };
+  if(isCsv) reader.readAsText(file,'utf-8'); else reader.readAsArrayBuffer(file);
+  input.value='';
+}
+
+function loteGuessAccCol(headers, rows){
+  const known = new Set(allData.map(t=>t.conta_cod));
+  const knownNorm = {}; allData.forEach(t=>{ if(t.conta_cod) knownNorm[loteNorm(t.conta_cod)]=1; });
+  const sample = rows.slice(0,300);
+  let best=-1, bestScore=-1;
+  for(let c=0;c<headers.length;c++){
+    let s=0;
+    sample.forEach(r=>{ const v=String(r[c]==null?'':r[c]).trim(); if(!v) return; if(known.has(v)||knownNorm[loteNorm(v)]) s++; });
+    if(s>bestScore){ bestScore=s; best=c; }
+  }
+  if(bestScore>0) return best;
+  const h = headers.map(x=>String(x).toLowerCase());
+  const byName = h.findIndex(x=>x.includes('conta')||x.includes('cód')||x.includes('cod')||x.includes('cta')||x.includes('reduz'));
+  return byName>=0 ? byName : 0;
+}
+function loteGuessValCol(headers){
+  const h = headers.map(x=>String(x).toLowerCase());
+  const pri = ['abertura','saldo final','saldo atual','final','atual','saldo anterior','anterior','saldo','valor'];
+  for(const p of pri){ const i=h.findIndex(x=>x.includes(p)); if(i>=0) return i; }
+  return headers.length-1;
+}
+
+function loteBuildMapUI(accCol, valCol){
+  const opts = sel => _loteImport.headers.map((h,i)=>`<option value="${i}" ${i===sel?'selected':''}>${(h||('Coluna '+(i+1)))}</option>`).join('');
+  const m = document.getElementById('lote-map');
+  m.innerHTML = `<div class="lmrow">
+    <label>Coluna da <strong>conta</strong>:</label>
+    <select id="lote-acccol" onchange="loteRemap()">${opts(accCol)}</select>
+    <label>Coluna do <strong>saldo 31/12</strong>:</label>
+    <select id="lote-valcol" onchange="loteRemap()">${opts(valCol)}</select>
+    <span id="lote-matchinfo" class="lmatch"></span>
+  </div>`;
+  m.style.display='block';
+}
+
+function loteRemap(){
+  if(!_loteImport) return;
+  const accCol = +document.getElementById('lote-acccol').value;
+  const valCol = +document.getElementById('lote-valcol').value;
+  const known = new Set(allData.map(t=>t.conta_cod));
+  const norm = {}; allData.forEach(t=>{ if(t.conta_cod) norm[loteNorm(t.conta_cod)] = t.conta_cod; });
+  let matched = 0;
+  _loteImport.rows.forEach(r=>{
+    const raw = String(r[accCol]==null?'':r[accCol]).trim();
+    if(!raw) return;
+    const conta = known.has(raw) ? raw : norm[loteNorm(raw)];
+    if(!conta) return;
+    const v = r[valCol];
+    if(v===''||v==null) return;
+    _loteVals[conta] = String(v).trim();
+    matched++;
+  });
+  const info = document.getElementById('lote-matchinfo');
+  if(info) info.textContent = matched + ' conta(s) casada(s) com o app';
+  loteRenderGrid();
+}
+
+function loteAplicar(){
+  loteSyncVisible();
+  const desired = {};
+  Object.entries(_loteVals).forEach(([conta, raw])=>{
+    const s = String(raw).trim();
+    if(s==='') return;                 // em branco = não informar
+    const v = parseSaldoNum(s);
+    if(!isNaN(v)) desired[conta] = Math.abs(v);   // magnitude; natureza vem do código
+  });
+  // Remover saldos que foram apagados (estavam salvos, agora em branco)
+  Object.keys(saldosAbertura).forEach(conta=>{
+    if(!(conta in desired)){
+      allData.forEach(t=>{ if(t._was_ant && t.conta_cod===conta){ t.status=t._orig_st||'open'; t._was_ant=false; t.match_status=''; } });
+      delete saldosAbertura[conta];
+    }
+  });
+  // Aplicar/atualizar (aplicarSaldoConta já reseta as marcas anteriores da própria conta)
+  Object.entries(desired).forEach(([conta, val])=> aplicarSaldoConta(conta, val));
+  persistSaldos();
+  fecharSaldosLote();
+  // Mudar o filtro para "Todas as contas" e renderizar tudo conciliado
+  _contasFiltro=null; updateContaBtnLabel(); renderContaCheckboxes();
+  syncSaldoBar(); renderBadges();
+  if(typeof tfAplicar==='function') tfAplicar(); else renderAll();
+  const n = Object.keys(desired).length;
+  alert('✓ Saldos de abertura aplicados em ' + n + ' conta(s).\nFiltro ajustado para "Todas as contas" — a análise consolidada já está na tela.');
+}
 
 </script>
+
+<style id="lote-css">
+.lote-overlay{position:fixed;inset:0;background:rgba(26,25,22,.55);z-index:9999;display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;}
+.lote-modal{background:var(--surface);width:100%;max-width:760px;border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,.3);display:flex;flex-direction:column;max-height:88vh;font-family:var(--font);}
+.lote-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);background:var(--saldo-bg);border-radius:8px 8px 0 0;}
+.lote-head h3{margin:0;font-size:15px;color:var(--warn);}
+.lote-head h3 span{font-size:11px;color:var(--text3);font-weight:normal;}
+.lote-x{border:none;background:none;font-size:18px;cursor:pointer;color:var(--text3);}
+.lote-x:hover{color:var(--danger);}
+.lote-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--border);}
+.lote-busca{flex:1;min-width:160px;height:30px;padding:0 10px;border:1px solid var(--border2);border-radius:4px;font-size:12px;font-family:var(--font);}
+.lote-count{font-size:11px;color:var(--text3);white-space:nowrap;}
+.ltbtn{height:30px;padding:0 12px;border:none;border-radius:4px;font-size:12px;font-family:var(--font);cursor:pointer;color:#fff;}
+.ltbtn.imp{background:var(--info);}.ltbtn.zer{background:var(--warn);}.ltbtn.lim{background:var(--neutral);}
+.ltbtn.apply{background:var(--accent);font-weight:bold;}.ltbtn.cancel{background:var(--neutral2);}
+.ltbtn:hover{filter:brightness(1.1);}
+.lote-map{padding:10px 18px;background:var(--surface2);border-bottom:1px solid var(--border);}
+.lmrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12px;color:var(--text2);}
+.lmrow select{height:28px;border:1px solid var(--border2);border-radius:4px;font-size:12px;max-width:220px;}
+.lmatch{color:var(--accent);font-weight:bold;}
+.lote-gridwrap{overflow:auto;flex:1;}
+.lote-grid{width:100%;border-collapse:collapse;font-size:12px;}
+.lote-grid th{position:sticky;top:0;background:var(--surface2);text-align:left;padding:7px 10px;border-bottom:1px solid var(--border2);color:var(--text2);font-size:11px;text-transform:uppercase;letter-spacing:.04em;}
+.lote-grid td{padding:5px 10px;border-bottom:1px solid var(--border);}
+.lote-grid td.lc{font-family:var(--mono);font-weight:bold;color:var(--text);white-space:nowrap;}
+.lote-grid td.ld{color:var(--text2);}
+.lnat{font-size:10px;padding:1px 7px;border-radius:10px;font-weight:bold;}
+.lnat.np{background:var(--info-bg);color:var(--info);}
+.lnat.na2{background:var(--accent-bg);color:var(--accent);}
+.lote-inp{width:130px;height:28px;padding:0 8px;border:1px solid var(--saldo-input-border);border-radius:4px;font-family:var(--mono);font-size:12px;text-align:right;background:var(--surface);color:var(--text);}
+.lote-inp:focus{outline:2px solid var(--accent2);}
+.lote-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px;border-top:1px solid var(--border);background:var(--surface2);border-radius:0 0 8px 8px;flex-wrap:wrap;}
+.lote-hint{font-size:10.5px;color:var(--text3);max-width:380px;line-height:1.4;}
+</style>
+
+<div id="lote-overlay" class="lote-overlay" onclick="if(event.target===this)fecharSaldosLote()">
+  <div class="lote-modal">
+    <div class="lote-head">
+      <h3>📋 Saldos de Abertura em lote <span>(31/12/2025)</span></h3>
+      <button class="lote-x" onclick="fecharSaldosLote()">✕</button>
+    </div>
+    <div class="lote-tools">
+      <button class="ltbtn imp" onclick="document.getElementById('lote-fi').click()">⬆ Importar balancete</button>
+      <input type="file" id="lote-fi" accept=".xlsx,.xls,.csv" style="display:none" onchange="loteImportBalancete(this)">
+      <button class="ltbtn zer" onclick="loteZerarTodos()">Zerar todos (0,00)</button>
+      <button class="ltbtn lim" onclick="loteLimparTodos()">Limpar</button>
+      <input type="text" id="lote-busca" class="lote-busca" placeholder="🔎 filtrar conta ou descrição" oninput="loteRenderGrid()">
+      <span class="lote-count" id="lote-count"></span>
+    </div>
+    <div id="lote-map" class="lote-map" style="display:none"></div>
+    <div class="lote-gridwrap">
+      <table class="lote-grid">
+        <thead><tr><th>Conta</th><th>Descrição</th><th>Natureza</th><th style="text-align:right">Saldo 31/12/2025</th></tr></thead>
+        <tbody id="lote-tb"></tbody>
+      </table>
+    </div>
+    <div class="lote-foot">
+      <span class="lote-hint">Em branco = não informado · 0,00 = sem saldo de abertura · informe o valor positivo (a natureza Ativo/Passivo é definida pelo código da conta).</span>
+      <div style="display:flex;gap:8px;">
+        <button class="ltbtn cancel" onclick="fecharSaldosLote()">Cancelar</button>
+        <button class="ltbtn apply" onclick="loteAplicar()">✓ Aplicar todos</button>
+      </div>
+    </div>
+  </div>
+</div>
 </body>
 </html>
