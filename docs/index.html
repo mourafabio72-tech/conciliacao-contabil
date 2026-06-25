@@ -1562,7 +1562,12 @@ function classifyAll(tx){
     // Lançamentos sem NF podem casar por valor (compensação genérica).
     // ───────────────────────────────────────────────────────────────────────
 
-    // 1. Match por NF exata: débito × crédito com a MESMA NF extraída.
+    // 1. Match por NF exata: agrupa débitos e créditos por NF (uma NF pode
+    // ter várias linhas — ex. NF SAIDA com entrega parcial + complemento) e
+    // compara o TOTAL do grupo, não linha a linha. Sem agrupar, 2 débitos da
+    // mesma NF contra 1 crédito (ou vice-versa) pareavam 1:1 na ordem do
+    // array, sobrando uma linha solta e gerando uma diferença "partial"
+    // artificial — às vezes até negativa — mesmo quando a soma batia exato.
     // Apenas lançamentos ainda 'open' e com NF identificada — o critério é o
     // número da NF (exNF), não as palavras-chave do histórico (is_nf/is_rec):
     // históricos como "RPS SAIDA 000010372" (débito) ou "BX REF NF - 000010372"
@@ -1571,36 +1576,42 @@ function classifyAll(tx){
     // presos em "Em Aberto" para sempre, mesmo com NF e valor batendo.
     const nfIt = items.filter(t => t.debito>0  && t.nf && t.status==='open');
     const rcIt = items.filter(t => t.credito>0 && t.nf && t.status==='open');
-    const usedR = new Set();
 
-    nfIt.forEach(nf => {
-      const rec = rcIt.find(r => !usedR.has(r) && r.nf===nf.nf && r.status==='open');
-      if (!rec) return;
-      usedR.add(rec);
-      const diff = Math.abs(nf.debito - rec.credito);
-      const pct  = nf.debito>0 ? (diff/nf.debito*100) : 0;
+    const gruposNF = {};
+    const grupo = nf => gruposNF[nf] || (gruposNF[nf]={nf,debs:[],creds:[],totDeb:0,totCred:0});
+    nfIt.forEach(t => { const g=grupo(t.nf); g.debs.push(t);  g.totDeb  += t.debito;  });
+    rcIt.forEach(t => { const g=grupo(t.nf); g.creds.push(t); g.totCred += t.credito; });
+
+    Object.values(gruposNF).forEach(g => {
+      if (!g.debs.length || !g.creds.length) return; // só tem débito OU só crédito dessa NF — fica 'open'
+      const diff  = Math.abs(g.totDeb - g.totCred);
+      const pct   = g.totDeb>0 ? (diff/g.totDeb*100) : 0;
+      const razao = g.debs[0].razao_social || g.creds[0].razao_social;
 
       if (diff < 0.02) {
-        // Match exato
-        nf.status='match';  nf.match_status='Match NF/Rec';  nf.saldo_aberto=0;
-        rec.status='match'; rec.match_status='Match NF/Rec'; rec.saldo_aberto=0;
-        pares.push({tipo:'match',data_nf:nf.data,data_rec:rec.data,nf_num:nf.nf,
-          razao:nf.razao_social||rec.razao_social,conta:nf.conta_cod,
-          vl_nf:nf.debito,vl_rec:rec.credito,diferenca:0,pct:0});
+        // Match exato (soma do grupo bate) — todas as linhas do grupo fecham
+        g.debs.forEach(t=>{ t.status='match'; t.match_status='Match NF/Rec'; t.saldo_aberto=0; });
+        g.creds.forEach(t=>{ t.status='match'; t.match_status='Match NF/Rec'; t.saldo_aberto=0; });
+        pares.push({tipo:'match',data_nf:g.debs[0].data,data_rec:g.creds[0].data,nf_num:g.nf,
+          razao,conta:g.debs[0].conta_cod,vl_nf:g.totDeb,vl_rec:g.totCred,diferenca:0,pct:0});
       } else if (pct>0.1 && pct<35) {
-        // Retenção de imposto
-        nf.status='ret';  nf.match_status='Retenção '+pct.toFixed(1)+'%'; nf.ret_val=diff; nf.saldo_aberto=diff;
-        rec.status='ret'; rec.match_status='Retenção '+pct.toFixed(1)+'%'; rec.ret_val=diff; rec.saldo_aberto=0;
-        pares.push({tipo:'ret',data_nf:nf.data,data_rec:rec.data,nf_num:nf.nf,
-          razao:nf.razao_social||rec.razao_social,conta:nf.conta_cod,
-          vl_nf:nf.debito,vl_rec:rec.credito,diferenca:diff,pct});
+        // Retenção de imposto — a diferença retida fica concentrada na 1ª
+        // linha de débito do grupo; as demais linhas (débito e crédito) já
+        // fecharam pela parte que casou, então saldo_aberto=0 nelas.
+        g.debs.forEach((t,i)=>{
+          t.status='ret'; t.match_status='Retenção '+pct.toFixed(1)+'%';
+          t.ret_val=diff; t.saldo_aberto = i===0 ? diff : 0;
+        });
+        g.creds.forEach(t=>{ t.status='ret'; t.match_status='Retenção '+pct.toFixed(1)+'%'; t.ret_val=diff; t.saldo_aberto=0; });
+        pares.push({tipo:'ret',data_nf:g.debs[0].data,data_rec:g.creds[0].data,nf_num:g.nf,
+          razao,conta:g.debs[0].conta_cod,vl_nf:g.totDeb,vl_rec:g.totCred,diferenca:diff,pct});
       } else {
-        // Diferença grande — parcial
-        nf.status='partial'; nf.saldo_aberto=nf.debito-rec.credito;
-        rec.status='match';  rec.saldo_aberto=0;
-        pares.push({tipo:'partial',data_nf:nf.data,data_rec:rec.data,nf_num:nf.nf,
-          razao:nf.razao_social||rec.razao_social,conta:nf.conta_cod,
-          vl_nf:nf.debito,vl_rec:rec.credito,diferenca:diff,pct});
+        // Diferença grande — parcial. Sobra concentrada na 1ª linha de
+        // débito; demais linhas do grupo já fecharam pela parte que casou.
+        g.debs.forEach((t,i)=>{ t.status='partial'; t.saldo_aberto = i===0 ? (g.totDeb-g.totCred) : 0; });
+        g.creds.forEach(t=>{ t.status='match'; t.saldo_aberto=0; });
+        pares.push({tipo:'partial',data_nf:g.debs[0].data,data_rec:g.creds[0].data,nf_num:g.nf,
+          razao,conta:g.debs[0].conta_cod,vl_nf:g.totDeb,vl_rec:g.totCred,diferenca:diff,pct});
       }
     });
 
