@@ -824,6 +824,14 @@ function toggleTheme(){
 
 // ── STATE ─────────────────────────────────────────────────────────────────
 let allData=[], filtData=[], pares=[], statusF='all', sortSt={}, saldosAbertura={}, composicaoItens={}, finData={rec:[], pag:[]}; // composicaoItens: {conta_cod: [{nf,razao,valor,data}]}
+// Grupos da composição por NF (ou por valor, se sem NF) com o saldo RESTANTE
+// depois de absorver as baixas do período — preenchido por aplicarSaldoConta.
+// Sem isso, getItensAbertos/buildSaldoRows só sabiam dizer "casou/não casou"
+// (tudo ou nada): uma NF de R$100.000 com baixa parcial de R$60.000 ficava
+// 100% fora do Em Aberto, em vez de mostrar os R$40.000 que ainda faltam —
+// causando a diferença entre o Saldo (Conciliação, sempre correto) e o
+// Saldo Total em Aberto (que deveria ser a mesma coisa, e não era).
+let composicaoGrupos = {}; // conta_cod -> [{nf,razao,valorOriginal,restante,itens}]
 // Data-base do saldo de abertura (string "DD/MM/YYYY") — editável pelo usuário
 // no campo da barra de Saldo de Abertura; persistida por empresa (IndexedDB).
 // Antes era um literal '31/12/2025' espalhado pelo código.
@@ -1741,7 +1749,8 @@ function aplicarSaldoConta(conta, val){
     const compPorNF = {};
     comp.forEach(it => {
       const k = it.nf || ('_val_'+it.valor);
-      if (!compPorNF[k]) compPorNF[k] = {nf:it.nf, razao:it.razao, restante:0, itens:[]};
+      if (!compPorNF[k]) compPorNF[k] = {nf:it.nf, razao:it.razao, valorOriginal:0, restante:0, itens:[]};
+      compPorNF[k].valorOriginal += it.valor;
       compPorNF[k].restante += it.valor;
       compPorNF[k].itens.push(it);
     });
@@ -1781,7 +1790,13 @@ function aplicarSaldoConta(conta, val){
       }
     });
 
+    // Persiste os grupos com o restante final — getItensAbertos/buildSaldoRows
+    // usam isso pra mostrar exatamente o que ainda falta de cada NF/título do
+    // saldo de abertura, em vez de um "casou tudo ou não casou nada".
+    composicaoGrupos[conta] = compRestante;
+
   } else {
+    composicaoGrupos[conta] = [];
     // ── MODO SALDO GLOBAL ──
     let rest=val;
     const nfsComContra = new Set(
@@ -2302,36 +2317,30 @@ function getItensAbertos(){
     )
   );
 
-  // 2. Itens da composição não compensados (virtuais — não estão no allData)
-  const comp = composicaoItens[conta];
-  if (comp && comp.length) {
-    // NFs que foram efetivamente recebidas no período (créditos marcados como anterior)
-    const nfsCasadas = new Set(
-      allData.filter(t => t._was_ant && t.conta_cod === conta && t.credito > 0)
-             .map(t => t.nf).filter(Boolean)
-    );
-    const valCasados = new Set(
-      allData.filter(t => t._was_ant && t.conta_cod === conta && t.credito > 0 && !t.nf)
-             .map(t => t.credito)
-    );
-
-    comp.forEach(it => {
-      const casado = (it.nf && nfsCasadas.has(it.nf)) ||
-                     (!it.nf && valCasados.has(it.valor));
-      if (!casado) {
+  // 2. Itens da composição NÃO totalmente compensados (virtuais — não estão
+  // no allData) — usa composicaoGrupos[conta] (preenchido por
+  // aplicarSaldoConta), que já trata baixa PARCIAL: uma NF de R$100.000 com
+  // baixa de R$60.000 mostra os R$40.000 que restam, em vez de desaparecer
+  // inteira do Em Aberto só porque achou ALGUMA baixa daquela NF (bug antigo).
+  const grupos = composicaoGrupos[conta];
+  if (grupos && grupos.length) {
+    const isPassivo = getNatureza(conta) === 'passivo';
+    grupos.forEach(g => {
+      if (g.restante > 0.009) {
+        const parcial = g.restante < g.valorOriginal - 0.009;
         base.push({
           _virtual: true,
-          data: new Date('2025-12-31T00:00:00'),
-          nf: it.nf || '—',
-          razao_social: it.razao || '—',
+          data: toDate(dataSaldoAnterior) || new Date(),
+          nf: g.nf || '—',
+          razao_social: g.razao || '—',
           conta_cod: conta,
           conta_desc: allData.find(x=>x.conta_cod===conta)?.conta_desc || '',
-          historico: 'Composição saldo ant.' + (it.nf ? ' NF '+it.nf : ''),
-          debito: it.valor,
-          credito: 0,
-          saldo_aberto: it.valor,
+          historico: 'Composição saldo ant.' + (g.nf ? ' NF '+g.nf : ''),
+          debito: isPassivo ? 0 : g.restante,
+          credito: isPassivo ? g.restante : 0,
+          saldo_aberto: g.restante,
           status: 'open',
-          match_status: 'Saldo anterior pendente',
+          match_status: parcial ? 'Saldo anterior pendente (parcial — recebido '+fBRL(g.valorOriginal-g.restante)+')' : 'Saldo anterior pendente',
           is_open_account: true
         });
       }
@@ -2935,35 +2944,40 @@ function buildSaldoRows(conta) {
     is_open: true
   });
 
-  // Itens da composição (se carregados)
-  const comp = composicaoItens[conta];
-  if (comp && comp.length) {
-    // Lado que é absorvido no período (reduz o saldo)
-    const absorveLado = isPassivo ? 'debito' : 'credito';
-    const casados = allData.filter(t => t._was_ant && t.conta_cod === conta && t[absorveLado] > 0);
-    const nfsCasadas    = new Set(casados.map(t => t.nf).filter(Boolean));
-    const valoresCasados = new Set(casados.map(t => t[absorveLado]));
-
-    comp.forEach(it => {
-      const foiCasadoPorNF  = it.nf && nfsCasadas.has(it.nf);
-      const foiCasadoPorVal = !it.nf && valoresCasados.has(it.valor);
-      const compensado = foiCasadoPorNF || foiCasadoPorVal;
+  // Itens da composição (se carregados) — um row por GRUPO de NF (não por
+  // linha bruta do arquivo: uma NF com 3 parcelas no arquivo é 1 título só).
+  // Usa composicaoGrupos[conta] (preenchido por aplicarSaldoConta), que trata
+  // baixa PARCIAL corretamente: mostra só o que realmente falta, não
+  // "tudo ou nada" (bug antigo — ver getItensAbertos).
+  const grupos = composicaoGrupos[conta];
+  if (grupos && grupos.length) {
+    grupos.forEach(g => {
+      const absorvido = g.valorOriginal - g.restante;
+      const compensado = g.restante <= 0.009;
+      const parcial = absorvido > 0.009 && !compensado;
+      const it0 = g.itens[0] || {};
 
       rows.push({
         _tipo: 'saldo_comp',
-        data_str: it.data_str || dataSaldoAnterior,
-        nf: it.nf || '—',
-        razao: it.razao || '—',
+        data_str: it0.data_str || dataSaldoAnterior,
+        nf: g.nf || '—',
+        razao: g.razao || '—',
         conta,
-        // Passivo: composição é crédito; Ativo: composição é débito
-        debito:  isPassivo ? 0        : it.valor,
-        credito: isPassivo ? it.valor : 0,
-        saldo_aberto: compensado ? 0 : it.valor,
+        // debito/credito mantém o valor ORIGINAL do título (não o restante)
+        // — é o que alimenta o saldo corrente acumulado em renderConcil, e
+        // não estou tocando nesse cálculo aqui (risco de financeiro errado
+        // sem confirmar números reais primeiro). Só saldo_aberto (usado pelo
+        // Em Aberto) reflete o restante de fato.
+        debito:  isPassivo ? 0        : g.valorOriginal,
+        credito: isPassivo ? g.valorOriginal : 0,
+        saldo_aberto: g.restante,
         status: compensado ? 'anterior' : 'open',
         match_status: compensado
           ? (isPassivo ? 'Pago no período' : 'Recebido no período')
-          : (isPassivo ? 'Pendente de pagamento' : 'Pendente de recebimento'),
-        historico: 'Composição saldo ant. NF ' + (it.nf||''),
+          : parcial
+            ? (isPassivo ? 'Parcial — pago '+fBRL(absorvido) : 'Parcial — recebido '+fBRL(absorvido))
+            : (isPassivo ? 'Pendente de pagamento' : 'Pendente de recebimento'),
+        historico: 'Composição saldo ant. NF ' + (g.nf||''),
         is_open: !compensado
       });
     });
