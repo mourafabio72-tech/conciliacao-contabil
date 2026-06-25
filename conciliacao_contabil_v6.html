@@ -1189,6 +1189,10 @@ function exNF(h){
   if(!h) return '';
   const s = String(h);
   let m;
+  // 0. NF SAIDA <filial>-<numero>-<nome>  (NF SAIDA 001-000004305-SYNGENTA,
+  // NF SAIDA 1  -000007319-COMPANHIA METALUR, NF SAIDA 001-00000...-NOME)
+  m = s.match(/NF\s+SAIDA\s+\d+\s*-\s*0*(\d{4,})/i);
+  if(m) return String(parseInt(m[1],10));
   // 1. NF seguido de ponto e dígitos: NF.000249, VL.NF.000204
   m = s.match(/NF\.0*(\d+)/i);
   if(m) return String(parseInt(m[1],10));
@@ -1216,6 +1220,14 @@ function exRS(h){
   if(!h) return '';
   const s = String(h);
   let m, name;
+
+  // Padrão 0: NF SAIDA <filial>-<numero>[-| ]<NOME> — mesma família do
+  // padrão 0 do exNF; pega tudo depois do número da NF (hífen ou espaços).
+  m = s.match(/NF\s+SAIDA\s+\d+\s*-\s*0*\d{4,}[\s-]+(.+)$/i);
+  if(m){
+    name = m[1].trim();
+    if(name && !/^[\d\.\-\/]+$/.test(name) && name.length > 1) return name;
+  }
 
   // Padrão 1: "... DE NOME ..." — usado em VLR.REF.A NF.xxx DE NOME e CANC.PGTO.NF - xxx DE NOME
   m = s.match(/\bDE\s+([A-Z0-9][A-Z0-9\s\.&]+?)(?:\s+(?:REF|ADR|SERV|COMP|OC|CONF|\d{2}\/)|\s*$)/i);
