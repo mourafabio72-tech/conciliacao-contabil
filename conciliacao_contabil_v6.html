@@ -2702,6 +2702,23 @@ function expXLSXConciliacao(){
     compCompensados.forEach(sr=>r4.push([sr.data_str,sr.nf,sr.razao,sr.conta,sr.historico,sr.credito||sr.debito,sr.match_status]));
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(r4),'Saldo Anterior');
   }
+  // Divergências — mesmos itens e métrica de auditoria da aba Divergências
+  // (ver getDivergencias/getCompGenericaStats). O bloco de auditoria no
+  // topo serve pra conferir a etapa de compensação genérica por valor: os
+  // dois totais absorvidos sempre devem bater matematicamente — se não
+  // baterem, é sinal de bug, não de diferença contábil real.
+  const divItems = getDivergencias();
+  const cgStats = getCompGenericaStats();
+  const r5=[
+    ['Auditoria — Compensação genérica por valor (lançamentos sem NF)'],
+    ['Total absorvido (débito)', cgStats.absDeb],
+    ['Total absorvido (crédito)', cgStats.absCred],
+    ['Diferença (deve ser R$ 0,00)', cgStats.diff],
+    [''],
+    ['Data','NF','Razão Social','Conta','Histórico','Débito','Crédito','Tipo','Situação']
+  ];
+  divItems.forEach(t=>r5.push([fDate(t.data),t.nf||'—',t.razao_social||'—',t.conta_cod,t.historico,t.debito,t.credito,t._divtipo,t._divsit]));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(r5),'Divergências');
   XLSX.writeFile(wb,'conciliacao_contabil.xlsx');
 }
 // ── COMPOSIÇÃO DO SALDO DE ABERTURA ──────────────────────────────────────
@@ -3134,6 +3151,22 @@ function getDivergencias(){
   return items.sort((a,b)=>a.data-b.data);
 }
 
+// Auditoria da compensação genérica por valor (etapa 4 do classifyAll —
+// só para lançamentos sem NF identificada): "absorvido" é quanto de cada
+// lançamento foi de fato casado (valor - saldo_aberto restante). Como o
+// algoritmo soma o MESMO valor nos dois lados a cada casamento (ver
+// classifyAll), o total absorvido no débito e no crédito SEMPRE deve
+// bater — mesmo quando a soma dos itens marcados 'closed' (que é por
+// lançamento individual, não por par) não bate, porque um lançamento só
+// fica 'closed' quando ELE MESMO fecha 100%, podendo ter recebido pedaços
+// de vários lançamentos do lado oposto que não fecharam por completo.
+function getCompGenericaStats(){
+  const pool = filtData.filter(t=>t.is_open_account && !t.nf && (t.status==='closed'||t.status==='partial'||t.status==='open'));
+  const absDeb  = pool.filter(t=>t.debito>0).reduce((s,t)=>s+(t.debito-(t.saldo_aberto||0)),0);
+  const absCred = pool.filter(t=>t.credito>0).reduce((s,t)=>s+(t.credito-(t.saldo_aberto||0)),0);
+  return {absDeb, absCred, diff: absDeb-absCred};
+}
+
 function renderDiverg(){
   const items = getDivergencias();
   const tb = document.getElementById('tb-diverg');
@@ -3145,6 +3178,8 @@ function renderDiverg(){
   const vlCredSem = credSemNF.reduce((s,t)=>s+t.credito,0);
   const vlDebClosed= debClosed.reduce((s,t)=>s+t.debito,0);
   const vlCompUnif = compUnif.reduce((s,t)=>s+(t.debito||t.credito||0),0);
+  const cg = getCompGenericaStats();
+  const cgOk = Math.abs(cg.diff) < 0.02;
 
   const m = document.getElementById('diverg-metrics');
   if(m) m.innerHTML=[
@@ -3154,6 +3189,9 @@ function renderDiverg(){
     ['Valor débitos divergentes', fBRL(vlDebClosed), 'var(--warn)'],
     ['Comp. Unificada (revisar)', compUnif.length, 'var(--unif)'],
     ['Valor Comp. Unificada', fBRL(vlCompUnif), 'var(--unif)'],
+    ['Comp. genérica — absorvido débito', fBRL(cg.absDeb), 'var(--text2)'],
+    ['Comp. genérica — absorvido crédito', fBRL(cg.absCred), 'var(--text2)'],
+    ['Diferença (deve ser R$ 0,00)', fBRL(cg.diff), cgOk?'var(--accent)':'var(--danger)'],
   ].map(([l,v,cor])=>`<div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:.6rem 1rem;min-width:160px;">
     <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3)">${l}</div>
     <div style="font-size:17px;font-family:var(--mono);color:${cor}">${v}</div>
