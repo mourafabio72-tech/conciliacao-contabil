@@ -3317,7 +3317,7 @@ function loadFinanceiro(input, tipo) {
       } else {
         const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+        const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', cellDates:true});
         // Detectar linha de cabeçalho (procurar linha com "cliente" ou "fornecedor" ou "nf" ou "parcela")
         let hdrRow = 0;
         for (let i=0;i<Math.min(raw.length,8);i++) {
@@ -3336,57 +3336,107 @@ function loadFinanceiro(input, tipo) {
         }
       }
 
+      const fmtD = d => {
+        if (!d) return '';
+        if (d instanceof Date) return d.toLocaleDateString('pt-BR');
+        const s = String(d);
+        const m = s.match(/(\d{4})-(\d{2})-(\d{2})/);
+        return m ? `${m[3]}/${m[2]}/${m[1]}` : s.substring(0,10);
+      };
+      const hoje = new Date(); hoje.setHours(0,0,0,0);
+      // Converte string "DD/MM/YYYY" (já formatada por fmtD) ou Date em Date,
+      // pra poder comparar com hoje e calcular dias de atraso.
+      const paraData = v => {
+        if (v instanceof Date) return v;
+        const m = String(v||'').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+        return m ? new Date(+m[3], +m[2]-1, +m[1]) : null;
+      };
+
       // Mapear campos: NF, cliente/fornecedor, valor, vencimento, emissao, status, dias
       finData[tipo] = rows.map(r => {
-        // NF: extrair número do campo "Prf-Numero Parcela"
-        // Formato: "1  -000511   -", "NFS-002336   -", "RPS-019988   -", "UNI-001396   -"
-        // Regra: pegar o número entre o primeiro hífen e o segundo hífen
-        const nfRaw = r['prf-numero parcela'] || r['parcela'] || r['nf'] || r['numero'] || r['titulo'] || '';
-        const nfStr = String(nfRaw).trim();
-        // Padrão primário: PREFIXO-NUMERO- (ex: "1  -000511   -", "NFS-002336   -")
-        let nfM = nfStr.match(/^[A-Z0-9\s]+-\s*0*(\d+)\s*-/i);
-        // Padrão secundário: qualquer número com 3+ dígitos após hífen
-        if (!nfM) nfM = nfStr.match(/-\s*0*(\d{3,})/);
-        const nf = nfM ? String(parseInt(nfM[1],10)) : nfStr;
+        // Layout real de Contas a Receber/Pagar do Protheus: colunas
+        // separadas (Prefixo / No. Titulo / Parcela / Nome Cliente /
+        // Vlr.Titulo / DT Baixa / Vlr.Liq Baix...), diferente do formato
+        // combinado "Prf-Numero Parcela" assumido antes.
+        const layoutProtheusCR = r['no. titulo']!==undefined || r['nome cliente']!==undefined ||
+                                  r['nome fornecedor']!==undefined || r['vlr.titulo']!==undefined;
 
-        // Cliente/Fornecedor
-        const parteNome = r['codigo-lj-nome do cliente'] || r['codigo-lj-nome do fornecedor'] ||
-                          r['cliente'] || r['fornecedor'] || r['nome'] || '';
-        const parteStr = String(parteNome).trim();
-        // Formato: "000516-01-ABRAGET" ou "000516-01-036 - BR W3 CT"
-        // Extrair tudo após "XXXXXX-XX-"
-        let nomeM = parteStr.match(/^\d{6}-\d{2}-(.+)$/);
-        let nome = nomeM ? nomeM[1].trim() : parteStr;
-        // Se ainda tiver "036 - NOME", remover o código da loja
-        nome = nome.replace(/^\d{3}\s*-\s*/, '').trim();
+        let nf, nfStr, parteNome, nome, vlOrig, vlAberto, dtEmissaoRaw, dtVenctoRaw;
 
-        // Valores
-        const vlOrig  = parseFloat(r['valor original']||r['valor']||r['vl original']||0)||0;
-        const vlVenc  = parseFloat(r['tit vencidos valor atual']||r['vencido']||0)||0;
-        const vlAVenc = parseFloat(r['titulos a vencer valor atual']||r['a vencer']||0)||0;
-        const vlAberto= vlOrig; // usar Valor Original conforme solicitado
-        const dias    = parseInt(r['dias atraso']||r['atraso']||0)||0;
+        if (layoutProtheusCR) {
+          // NF: prioriza NF eletrônica (quando emitida); senão usa o nº do
+          // título interno do Protheus — ambos sem zeros à esquerda, pra
+          // cruzar com o número que o exNF extrai do histórico do razão.
+          const nfEletrRaw = String(r['nf eletr']||'').trim();
+          const noTituloRaw = String(r['no. titulo']||'').trim();
+          nfStr = nfEletrRaw || noTituloRaw;
+          const nfNum = parseInt(nfStr.replace(/\D/g,''),10);
+          nf = nfStr ? (Number.isFinite(nfNum) ? String(nfNum) : nfStr) : '';
 
-        // Datas
-        const dtEmissao = r['data de emissao'] || r['emissao'] || r['dt emissao'] || '';
-        const dtVencto  = r['vencto real'] || r['vencimento'] || r['vencto titulo'] || '';
+          parteNome = r['nome cliente'] || r['nome fornecedor'] || '';
+          nome = String(parteNome).trim();
 
-        const fmtD = d => {
-          if (!d) return '';
-          if (d instanceof Date) return d.toLocaleDateString('pt-BR');
-          const s = String(d);
-          const m = s.match(/(\d{4})-(\d{2})-(\d{2})/);
-          return m ? `${m[3]}/${m[2]}/${m[1]}` : s.substring(0,10);
-        };
+          vlOrig = toNum(r['vlr.titulo']);
+          const vlLiqBaix = toNum(r['vlr.liq baix']);
+          const dtBaixaStr = String(r['dt baixa']||'').trim();
+          const baixado = dtBaixaStr && dtBaixaStr!=='-';
+          // Baixado: sobra (se a baixa não cobriu o valor todo). Aberto:
+          // valor do título inteiro ainda não recebido/pago.
+          vlAberto = baixado ? Math.max(vlOrig - vlLiqBaix, 0) : vlOrig;
+
+          dtEmissaoRaw = r['dt emissao'] || '';
+          dtVenctoRaw  = r['vencto real'] || r['vencimento'] || '';
+        } else {
+          // NF: extrair número do campo "Prf-Numero Parcela"
+          // Formato: "1  -000511   -", "NFS-002336   -", "RPS-019988   -", "UNI-001396   -"
+          // Regra: pegar o número entre o primeiro hífen e o segundo hífen
+          const nfRaw = r['prf-numero parcela'] || r['parcela'] || r['nf'] || r['numero'] || r['titulo'] || '';
+          nfStr = String(nfRaw).trim();
+          // Padrão primário: PREFIXO-NUMERO- (ex: "1  -000511   -", "NFS-002336   -")
+          let nfM = nfStr.match(/^[A-Z0-9\s]+-\s*0*(\d+)\s*-/i);
+          // Padrão secundário: qualquer número com 3+ dígitos após hífen
+          if (!nfM) nfM = nfStr.match(/-\s*0*(\d{3,})/);
+          nf = nfM ? String(parseInt(nfM[1],10)) : nfStr;
+
+          // Cliente/Fornecedor
+          parteNome = r['codigo-lj-nome do cliente'] || r['codigo-lj-nome do fornecedor'] ||
+                            r['cliente'] || r['fornecedor'] || r['nome'] || '';
+          const parteStr = String(parteNome).trim();
+          // Formato: "000516-01-ABRAGET" ou "000516-01-036 - BR W3 CT"
+          // Extrair tudo após "XXXXXX-XX-"
+          let nomeM = parteStr.match(/^\d{6}-\d{2}-(.+)$/);
+          nome = nomeM ? nomeM[1].trim() : parteStr;
+          // Se ainda tiver "036 - NOME", remover o código da loja
+          nome = nome.replace(/^\d{3}\s*-\s*/, '').trim();
+
+          vlOrig  = parseFloat(r['valor original']||r['valor']||r['vl original']||0)||0;
+          vlAberto= vlOrig; // usar Valor Original conforme solicitado
+
+          dtEmissaoRaw = r['data de emissao'] || r['emissao'] || r['dt emissao'] || '';
+          dtVenctoRaw  = r['vencto real'] || r['vencimento'] || r['vencto titulo'] || '';
+        }
+
+        const dtEmissao = fmtD(dtEmissaoRaw);
+        const dtVencto  = fmtD(dtVenctoRaw);
+
+        // Vencido/a vencer e dias de atraso: calculado a partir do vencimento
+        // real comparado a hoje (o layout Protheus não traz essas colunas
+        // prontas — só "Tit Vencidos"/"Titulos a Vencer" no formato antigo).
+        const dVenc = paraData(dtVencto);
+        const diasCalc = dVenc ? Math.round((hoje - dVenc) / 86400000) : 0;
+        const vencido = dVenc ? diasCalc > 0 : (toNum(r['tit vencidos valor atual']||r['vencido']) > 0);
+        const dias = layoutProtheusCR ? Math.max(diasCalc, 0) : (parseInt(r['dias atraso']||r['atraso']||0)||0);
+        const vlVenc  = layoutProtheusCR ? (vencido ? vlAberto : 0) : (parseFloat(r['tit vencidos valor atual']||r['vencido']||0)||0);
+        const vlAVenc = layoutProtheusCR ? (vencido ? 0 : vlAberto) : (parseFloat(r['titulos a vencer valor atual']||r['a vencer']||0)||0);
 
         return {
           nf, nome, vlOrig, vlAberto, vlVenc, vlAVenc, dias,
-          dtEmissao: fmtD(dtEmissao), dtVencto: fmtD(dtVencto),
-          statusFin: vlVenc>0 ? 'Vencido' : 'A vencer',
+          dtEmissao, dtVencto,
+          statusFin: vencido ? 'Vencido' : 'A vencer',
           _idx: nfStr+'|'+String(parteNome)+'|'+String(vlOrig),
           _raw: r
         };
-      }).filter(r => r.vlAberto > 0 || r.vlOrig > 0);
+      }).filter(r => r.vlAberto > 0.009);
 
       lbl.textContent = `✓ ${finData[tipo].length} títulos carregados — R$ ${fBRL(finData[tipo].reduce((s,r)=>s+r.vlAberto,0))}`;
       popularSelectClientes();
