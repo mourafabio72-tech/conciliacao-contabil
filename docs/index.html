@@ -2606,24 +2606,16 @@ function expXLSXConciliacao(){
   const hasSaldo=conta && saldosAbertura[conta]!==undefined;
   let saldoCor=hasSaldo?saldosAbertura[conta]:0;
   const r1=[['Data','NF','Razão Social','Conta','Descrição','Histórico','Débito','Crédito','Saldo','Status','Observação']];
-  // Linhas de saldo de abertura
-  if(hasSaldo){
-    const isPassHdr = getNatureza(conta)==='passivo';
-    r1.push([dataSaldoAnterior,'—','SALDO DE ABERTURA',conta,'','Saldo inicial do período',
-      isPassHdr?0:saldosAbertura[conta],
-      isPassHdr?saldosAbertura[conta]:0,
-      saldoCor,'anterior','Saldo informado em '+dataSaldoAnterior]);
-    const comp=composicaoItens[conta];
-    if(comp){
-      const isPassXl = getNatureza(conta)==='passivo';
-      comp.forEach(it=>{
-        saldoCor = saldoCor + it.valor;
-        const dXl = isPassXl ? 0        : it.valor;
-        const cXl = isPassXl ? it.valor : 0;
-        r1.push([it.data_str||dataSaldoAnterior,it.nf||'—',it.razao||'—',conta,'','Composição saldo anterior',dXl,cXl,saldoCor,'open','Saldo anterior']);
-      });
-    }
-  }
+  // Linhas de saldo de abertura — reusa buildSaldoRows(), a MESMA função que
+  // a tela (renderConcil) usa. Antes esta sheet recalculava tudo de novo com
+  // status/observação fixos ('open'/'Saldo anterior'), sem checar se a NF da
+  // composição já tinha sido compensada por uma baixa no período — por isso
+  // a tela mostrava "Recebido" e o Excel sempre mostrava "Em aberto" para o
+  // mesmo item. Usando sRows directly, export e tela ficam sempre iguais.
+  sRows.forEach(sr=>{
+    if(sr._tipo!=='saldo_header') saldoCor = saldoCor + (sr.debito||sr.credito);
+    r1.push([sr.data_str,sr.nf,sr.razao,sr.conta,'',sr.historico,sr.debito,sr.credito,saldoCor,sr.status,sr.match_status]);
+  });
   // Itens com Match NF = Recebimento vão para uma sheet própria — já estão
   // 100% conciliados (débito e crédito da mesma NF se cancelam), então não
   // precisam de revisão manual e só "sujam" a sheet de Conciliação, que é
