@@ -2691,14 +2691,25 @@ function loadComposicao(input) {
       if (file.name.endsWith('.csv')) {
         // Parse CSV simples
         const lines = e.target.result.split('\n').filter(l=>l.trim());
-        const header = lines[0].split(';').map(h=>h.trim().toLowerCase());
         // Suporta separador ; ou ,
         const sep = lines[0].includes(';') ? ';' : ',';
-        const hdr = lines[0].split(sep).map(h=>h.replace(/"/g,'').trim().toLowerCase());
+        // ci(): busca por substring no cabeçalho, tolera acento (compara sem
+        // diacríticos) — ex.: "histórico" e "historico" batem com 'hist'.
+        const norm = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
+        // Detectar a linha de cabeçalho real — pode haver linha(s) de título
+        // antes (ex.: código + descrição da conta), igual ao branch XLSX abaixo.
+        let hdrRowCSV = 0;
+        for (let i=0; i<Math.min(lines.length,8); i++){
+          const joined = norm(lines[i]);
+          if (/\bdata\b/.test(joined) || /\bhist/.test(joined) || /\bvalor\b/.test(joined) || /\bnf\b/.test(joined)){
+            hdrRowCSV = i; break;
+          }
+        }
+        const hdr = lines[hdrRowCSV].split(sep).map(h=>norm(h.replace(/"/g,'')));
         const iContaCSV = hdr.indexOf('conta');
         if (iContaCSV >= 0) {
           contasNoArquivo = [...new Set(
-            lines.slice(1)
+            lines.slice(hdrRowCSV+1)
               .map(l => l.split(sep)[iContaCSV]?.replace(/"/g,'').trim())
               .filter(v => v && v !== 'Conta')
           )];
@@ -2711,13 +2722,9 @@ function loadComposicao(input) {
             return;
           }
         }
-        // ci(): busca por substring no cabeçalho, tolera acento (compara sem
-        // diacríticos) — ex.: "histórico" e "historico" batem com 'hist'.
-        const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g,'');
-        const hdrN = hdr.map(norm);
-        const ciCSV = h => hdrN.findIndex(x=>x.includes(norm(h)));
+        const ciCSV = h => hdr.findIndex(x=>x.includes(norm(h)));
         const iHistCSV = ciCSV('hist');
-        for (let i=1;i<lines.length;i++) {
+        for (let i=hdrRowCSV+1;i<lines.length;i++) {
           const cols = lines[i].split(sep).map(c=>c.replace(/"/g,'').trim());
           if (!cols.join('')) continue;
           // Filtrar pela conta selecionada se arquivo tiver coluna conta
@@ -2740,7 +2747,19 @@ function loadComposicao(input) {
         // ci(): busca por substring no cabeçalho tolerando acento (compara sem
         // diacríticos) — ex.: "histórico"/"razão" batem com 'hist'/'razao'.
         const normH = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
-        const hdr = rows[0].map(normH);
+        // Detectar a linha de cabeçalho real — pode haver 1+ linhas de título
+        // antes (ex.: "1.1.0.90.10002  CLIENTES - DIVERSOS", igual ao topo de
+        // um extrato de conta), e só depois vem a linha com "Data/Histórico/
+        // Valor". Sem isso, rows[0] (a linha de título) era tratada como
+        // cabeçalho e a detecção de coluna saía toda errada.
+        let hdrRow = 0;
+        for (let i=0; i<Math.min(rows.length,8); i++){
+          const joined = rows[i].map(c=>normH(c||'')).join(' ');
+          if (/\bdata\b/.test(joined) || /\bhist/.test(joined) || /\bvalor\b/.test(joined) || /\bnf\b/.test(joined)){
+            hdrRow = i; break;
+          }
+        }
+        const hdr = rows[hdrRow].map(normH);
         const ci  = h => hdr.findIndex(x=>x.includes(h));
         const iHist  = ci('hist'); // histórico/historico — texto livre com NF e nome embutidos
         // Sem coluna dedicada de NF/Razão Social: ficam -1 e o fallback abaixo
@@ -2753,7 +2772,7 @@ function loadComposicao(input) {
         // Se o arquivo tiver coluna "conta", filtrar apenas linhas da conta selecionada
         const iConta = ci('conta') >= 0 ? ci('conta') : -1;
         contasNoArquivo = iConta >= 0
-          ? [...new Set(rows.slice(1).map(r=>String(r[iConta]||'').trim()).filter(v=>v&&v!=='Conta'))]
+          ? [...new Set(rows.slice(hdrRow+1).map(r=>String(r[iConta]||'').trim()).filter(v=>v&&v!=='Conta'))]
           : [];
         const temMultiContas = contasNoArquivo.length > 1;
 
@@ -2770,7 +2789,7 @@ function loadComposicao(input) {
           console.log('Arquivo com múltiplas contas. Filtrando pela conta:', conta);
         }
 
-        for (let i=1;i<rows.length;i++) {
+        for (let i=hdrRow+1;i<rows.length;i++) {
           const r = rows[i];
           if (!r.join('')) continue;
 
