@@ -1264,6 +1264,11 @@ function exRS(h){
   const parts = s.split(/\s+-\s+/);
   if(parts.length >= 2){
     name = parts[parts.length-1].trim();
+    // Remove número da NF colado no início (sem espaço): "BX REF NF -
+    // 000001501-CPFL RENOVAVEIS" cai aqui com name="000001501-CPFL
+    // RENOVAVEIS" — sem isso o nome ficava com o número da NF na frente,
+    // diferente do lado do débito (que extrai só "CPFL RENOVAVEIS").
+    name = name.replace(/^0*\d{3,}-/,'').trim();
     // Remove sufixos comuns
     name = name.replace(/\s+(REF|SERV|MAT|COMP|OC|CONF)\.?.*$/i,'').trim();
     name = name.replace(/\s+[A-Z]$/,'').trim();
@@ -1587,12 +1592,39 @@ function classifyAll(tx){
     const nfIt = items.filter(t => t.debito>0  && t.nf && t.status==='open');
     const rcIt = items.filter(t => t.credito>0 && t.nf && t.status==='open');
 
-    const gruposNF = {};
-    const grupo = nf => gruposNF[nf] || (gruposNF[nf]={nf,debs:[],creds:[],totDeb:0,totCred:0});
-    nfIt.forEach(t => { const g=grupo(t.nf); g.debs.push(t);  g.totDeb  += t.debito;  });
-    rcIt.forEach(t => { const g=grupo(t.nf); g.creds.push(t); g.totCred += t.credito; });
+    // Agrupar só pela NF não basta: números de RPS/NFS reiniciam por série/
+    // loja/ano e podem coincidir entre empresas DIFERENTES (mesma NF "1501"
+    // pra um cliente em outubro e outro cliente totalmente diferente em
+    // outro lugar do arquivo) — juntar os dois geraria uma diferença de
+    // valor falsa entre lançamentos que não têm nada a ver um com o outro.
+    // Quando há nome extraído dos dois lados, busca um grupo já existente
+    // daquela NF cujo nome combine (substring nos dois sentidos, pra
+    // tolerar diferenças de formatação entre o histórico de débito e o de
+    // crédito); só funde sem checar nome quando um dos lados não tem nome
+    // extraído (sem isso pra comparar, mantém o comportamento antigo).
+    // gruposPorNF[nf] = lista de grupos daquela NF (normalmente só 1; mais de
+    // 1 só quando a mesma NF aparece pra contrapartes com nomes diferentes
+    // — busca escopada a essa lista, não a todos os grupos do arquivo, pra
+    // não pesar em razões com muitas NFs distintas.
+    const normNome = s => String(s||'').toUpperCase().trim();
+    const gruposPorNF = {};
+    function grupo(t){
+      const nome = normNome(t.razao_social);
+      const candidatos = gruposPorNF[t.nf] || (gruposPorNF[t.nf]=[]);
+      const achado = nome
+        ? candidatos.find(g => g.nome && (g.nome.includes(nome) || nome.includes(g.nome)))
+        // Sem nome extraído: agrupa só pela NF (comportamento original) —
+        // não há como comparar nomes pra desambiguar.
+        : candidatos.find(g => !g.nome);
+      if (achado) return achado;
+      const novo = {nf:t.nf, nome, debs:[], creds:[], totDeb:0, totCred:0};
+      candidatos.push(novo);
+      return novo;
+    }
+    nfIt.forEach(t => { const g=grupo(t); g.debs.push(t);  g.totDeb  += t.debito;  });
+    rcIt.forEach(t => { const g=grupo(t); g.creds.push(t); g.totCred += t.credito; });
 
-    Object.values(gruposNF).forEach(g => {
+    Object.values(gruposPorNF).flat().forEach(g => {
       if (!g.debs.length || !g.creds.length) return; // só tem débito OU só crédito dessa NF — fica 'open'
       const diff  = Math.abs(g.totDeb - g.totCred);
       const pct   = g.totDeb>0 ? (diff/g.totDeb*100) : 0;
