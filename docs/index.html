@@ -2607,13 +2607,16 @@ function expXLSXConciliacao(){
   let saldoCor=hasSaldo?saldosAbertura[conta]:0;
   const r1=[['Data','NF','Razão Social','Conta','Descrição','Histórico','Débito','Crédito','Saldo','Status','Observação']];
   // Linhas de saldo de abertura — reusa buildSaldoRows(), a MESMA função que
-  // a tela (renderConcil) usa. Antes esta sheet recalculava tudo de novo com
-  // status/observação fixos ('open'/'Saldo anterior'), sem checar se a NF da
-  // composição já tinha sido compensada por uma baixa no período — por isso
-  // a tela mostrava "Recebido" e o Excel sempre mostrava "Em aberto" para o
-  // mesmo item. Usando sRows directly, export e tela ficam sempre iguais.
+  // a tela (renderConcil) usa, então export e tela sempre mostram o mesmo
+  // status pra mesma linha. O cabeçalho (saldo_header) sempre fica na
+  // Conciliação, como referência do saldo inicial — mas os itens da
+  // composição já COMPENSADOS (status='anterior': a NF do saldo de abertura
+  // foi recebida/paga no período) saem daqui e vão para a sheet "Saldo
+  // Anterior" junto com os lançamentos do razão também marcados 'anterior'.
+  const compCompensados=[];
   sRows.forEach(sr=>{
     if(sr._tipo!=='saldo_header') saldoCor = saldoCor + (sr.debito||sr.credito);
+    if(sr._tipo==='saldo_comp' && sr.status==='anterior'){ compCompensados.push(sr); return; }
     r1.push([sr.data_str,sr.nf,sr.razao,sr.conta,'',sr.historico,sr.debito,sr.credito,saldoCor,sr.status,sr.match_status]);
   });
   // Itens com Match NF = Recebimento vão para uma sheet própria — já estão
@@ -2634,6 +2637,10 @@ function expXLSXConciliacao(){
       r1m.push([fDate(t.data),t.nf,t.razao_social,t.conta_cod,t.conta_desc,t.historico,t.debito,t.credito,t.status,t.match_status]);
       return; // não entra na sheet de Conciliação — mas o saldo corrente acima já contabilizou o efeito real do lançamento
     }
+    // status='anterior': é a baixa que liquidou um título do saldo de
+    // abertura (ver aplicarSaldoConta) — já vai para a sheet "Saldo Anterior"
+    // mais abaixo, não precisa repetir na Conciliação.
+    if(t.status==='anterior') return;
     r1.push([fDate(t.data),t.nf,t.razao_social,t.conta_cod,t.conta_desc,t.historico,t.debito,t.credito,hasSaldo?saldoCor:(t.saldo_aberto||0),t.status,t.match_status]);
   });
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(r1),'Conciliação');
@@ -2645,6 +2652,20 @@ function expXLSXConciliacao(){
   // Linha de total
   const totalAb=op.reduce((s,t)=>s+(t.saldo_aberto||t.debito||0),0);
   r2.push(['','','','','','','','TOTAL',totalAb,'','']);
+  // Saldo final em aberto agrupado por NF (reusa buildResultado(), a mesma
+  // função da aba Resultado Final — uma NF pode ter várias linhas no razão
+  // — ex. NF parcial + complemento — e o saldo final é por título, não por
+  // lançamento isolado).
+  r2.push(['']);
+  r2.push(['SALDO FINAL DA CONTA EM ABERTO — POR NF']);
+  r2.push(['Data','NF','Razão Social','Conta','Valor NF (Déb.)','Valor Rec. (Créd.)','Saldo em Aberto','Status','Observação']);
+  const resRows = buildResultado();
+  resRows.forEach(r=>r2.push([fDate(r.data),r.nf,r.razao,r.conta,r.debito,r.credito,r.saldo,r.status,r.obs||'']));
+  r2.push(['TOTAL','','',
+    '',
+    resRows.reduce((s,r)=>s+r.debito,0),
+    resRows.reduce((s,r)=>s+r.credito,0),
+    resRows.reduce((s,r)=>s+r.saldo,0),'','']);
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(r2),'Em Aberto');
   // Retenções — filtrar pelo mesmo critério de filtData
   const contasExp = new Set(filtData.map(t=>t.conta_cod).filter(Boolean));
@@ -2660,10 +2681,13 @@ function expXLSXConciliacao(){
   rp.forEach(p=>r3.push([fDate(p.data_nf),fDate(p.data_rec),p.nf_num,p.razao,p.conta,p.vl_nf,p.vl_rec,p.diferenca,p.pct.toFixed(2)+'%']));
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(r3),'Retenções');
   // Saldo Anterior
-  if(Object.keys(saldosAbertura).length>0){
+  if(Object.keys(saldosAbertura).length>0 || compCompensados.length){
     const an=allData.filter(t=>t.status==='anterior');
     const r4=[['Conta','Saldo Abertura ('+dataSaldoAnterior+')'],...Object.entries(saldosAbertura).map(([c,v])=>{const tx=allData.find(x=>x.conta_cod===c);return[c+(tx?' — '+tx.conta_desc:''),v];}),[''],['Data','NF','Razão Social','Conta','Histórico','Crédito','Observação']];
     an.forEach(t=>r4.push([fDate(t.data),t.nf,t.razao_social,t.conta_cod,t.historico,t.credito,t.match_status]));
+    // Itens da composição já compensados (baixa do período liquidou a NF do
+    // saldo de abertura) — ver explicação acima, na montagem da Conciliação.
+    compCompensados.forEach(sr=>r4.push([sr.data_str,sr.nf,sr.razao,sr.conta,sr.historico,sr.credito||sr.debito,sr.match_status]));
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(r4),'Saldo Anterior');
   }
   XLSX.writeFile(wb,'conciliacao_contabil.xlsx');
