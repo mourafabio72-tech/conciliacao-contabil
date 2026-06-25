@@ -1201,6 +1201,16 @@ function exNF(h){
   // NF SAIDA 1  -000007319-COMPANHIA METALUR, NF SAIDA 001-00000...-NOME)
   m = s.match(/NF\s+SAIDA\s+\d+\s*-\s*0*(\d{4,})/i);
   if(m) return String(parseInt(m[1],10));
+  // 0b. NFS/RPS <num>, com ou sem "SAIDA" no meio — formato SEM código de
+  // filial, número direto (não tem padding de zeros nem o segundo grupo de
+  // dígitos do padrão 0): "NFS SAIDA 766 - RAIZEN ENERGIA S.A", "RPS SAIDA
+  // 777 - MILETOT", "VLR INSS RET. REF NFS 3 - SHOPPING FASHI" (retenção
+  // referenciando a NFS), "NFS SAIDA 765 UOL - PAGSEGURO" (token extra
+  // entre o número e o hífen — por isso não exige hífen logo depois, só
+  // fim de número). Checado depois do padrão 0 — senão capturaria errado
+  // o código de filial da "NF SAIDA 001-..." em vez do número da NF.
+  m = s.match(/(?:NFS?|RPS)\s+(?:SAIDA\s+)?0*(\d+)\b/i);
+  if(m) return String(parseInt(m[1],10));
   // 1. NF seguido de ponto e dígitos: NF.000249, VL.NF.000204
   m = s.match(/NF\.0*(\d+)/i);
   if(m) return String(parseInt(m[1],10));
