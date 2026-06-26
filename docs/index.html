@@ -1209,7 +1209,7 @@ function exNF(h){
   // entre o número e o hífen — por isso não exige hífen logo depois, só
   // fim de número). Checado depois do padrão 0 — senão capturaria errado
   // o código de filial da "NF SAIDA 001-..." em vez do número da NF.
-  m = s.match(/(?:NFS?|RPS)\s+(?:SAIDA\s+)?0*(\d+)\b/i);
+  m = s.match(/(?:NFS?|RPS)[\s\/]+(?:SAIDA\s+)?0*(\d+)\b/i);
   if(m) return String(parseInt(m[1],10));
   // 1. NF seguido de ponto e dígitos: NF.000249, VL.NF.000204
   m = s.match(/NF\.0*(\d+)/i);
@@ -1217,8 +1217,9 @@ function exNF(h){
   // 2. NF nº 000xxx  ou  nf nº 000xxx  (com "nº" ou "no")
   m = s.match(/NF\s+n[oº°]?\.?\s*0*(\d+)/i);
   if(m) return String(parseInt(m[1],10));
-  // 3. NF - 000xxx  (CANC.PGTO.NF - 000000069)
-  m = s.match(/NF\s*-\s*0*(\d+)/i);
+  // 3. NF - 000xxx  (CANC.PGTO.NF - 000000069). Tolera mais de um hífen
+  // colado ("BX REF NF--000000244-SBV SERVICOS") com (?:\s*-)+.
+  m = s.match(/NF(?:\s*-)+\s*0*(\d+)/i);
   if(m) return String(parseInt(m[1],10));
   // 4. DOC. 000xxx  (PGTO.CF.CHQ. DOC. 000000249)
   m = s.match(/DOC\.\s*0*(\d+)/i);
@@ -1242,6 +1243,18 @@ function exRS(h){
   // Padrão 0: NF SAIDA <filial>-<numero>[-| ]<NOME> — mesma família do
   // padrão 0 do exNF; pega tudo depois do número da NF (hífen ou espaços).
   m = s.match(/NF\s+SAIDA\s+\d+\s*-\s*0*\d{4,}[\s-]+(.+)$/i);
+  if(m){
+    name = m[1].trim();
+    if(name && !/^[\d\.\-\/]+$/.test(name) && name.length > 1) return name;
+  }
+
+  // Padrão 0b: NF/NFS/RPS seguido de separador qualquer (espaço, barra ou
+  // hífen — em qualquer quantidade dos dois lados) e número, com o nome
+  // logo depois: "NFS/000000244  SBV SERVICOS" (barra), "BX REF NF--
+  // 000000244-SBV SERVICOS" (hífen duplo colado). Mais geral que o padrão
+  // 3 abaixo, que só separa por " - " (espaço-hífen-espaço) — aqui não
+  // exige espaço nenhum ao redor do separador.
+  m = s.match(/(?:NFS?|RPS)[\s\/-]+0*\d+[\s\/-]+(.+)$/i);
   if(m){
     name = m[1].trim();
     if(name && !/^[\d\.\-\/]+$/.test(name) && name.length > 1) return name;
