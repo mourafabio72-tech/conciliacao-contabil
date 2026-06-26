@@ -2801,11 +2801,11 @@ function expXLSXConciliacao(){
         const natX = getNatureza(conta);
         saldoCor = natX==='passivo' ? saldoCor - t.debito + t.credito : saldoCor + t.debito - t.credito;
       }
-    // Critério é o texto da observação, não só o status: o lado "recebimento"
-    // de um par 'partial' também herda status='match' (ver classifyAll), mas
-    // sem match_status — não é um Match NF/Rec de fato e deve continuar na
-    // sheet de Conciliação junto com o débito 'partial' correspondente.
-    if(t.match_status==='Match NF/Rec'){
+    // Qualquer lançamento com status='match' (NF+valor batendo exato, OU o
+    // lado que recebeu/pagou 100% de um par 'partial' — ver classifyAll)
+    // já está resolvido: não precisa de revisão manual, só "suja" a sheet
+    // de Conciliação, que é onde o contador foca o que falta tratar.
+    if(t.status==='match'){
       r1m.push([fDate(t.data),t.nf,t.razao_social,t.conta_cod,t.conta_desc,t.historico,t.debito,t.credito,t.status,t.match_status]);
       return; // não entra na sheet de Conciliação — mas o saldo corrente acima já contabilizou o efeito real do lançamento
     }
