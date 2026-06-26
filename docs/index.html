@@ -1298,40 +1298,54 @@ function exRS(h){
     }
   }
 
-  // Padrão 1: "... DE NOME ..." — usado em VLR.REF.A NF.xxx DE NOME e CANC.PGTO.NF - xxx DE NOME
-  m = s.match(/\bDE\s+([A-Z0-9][A-Z0-9\s\.&]+?)(?:\s+(?:REF|ADR|SERV|COMP|OC|CONF|\d{2}\/)|\s*$)/i);
-  if(m){
-    name = m[1].trim().replace(/\s+[A-Z]$/,'').trim();
-    // Ignorar se parece CNPJ puro (só dígitos e pontos)
-    if(!/^[\d\.\-\/]+$/.test(name) && name.length > 1) return name;
+  // Padrões 1-4 abaixo (ao contrário dos 0/0b/0c acima) não exigem o
+  // literal "NF"/"NFS"/"RPS"/"SPED" no próprio regex — só um separador
+  // genérico (" - ", "DE ", "FORNECEDOR "). Em contas SEM NF nenhuma (ex.:
+  // FGTS/INSS a recolher, com histórico tipo "CSN - FGTS" ou "P&D -
+  // EMPRESTIMO", só nome de centro de custo separado por hífen) isso
+  // "achava" um nome fantasma a partir de QUALQUER hífen no texto — ex.:
+  // "CSN - FGTS" virava razão social "FGTS", o que é lixo (não é
+  // contraparte nenhuma). Como em todos os exemplos reais que motivaram
+  // esses padrões (PGTO.CF.CHQ.DOC.xxx, VLR.REE xxx, COMP PA TITULO xxx)
+  // o exNF() já acha um número (DOC./REE/TITULO), usar isso como gate:
+  // só tenta os padrões genéricos quando já há uma NF/documento
+  // identificado no próprio histórico.
+  if(exNF(s)){
+    // Padrão 1: "... DE NOME ..." — usado em VLR.REF.A NF.xxx DE NOME e CANC.PGTO.NF - xxx DE NOME
+    m = s.match(/\bDE\s+([A-Z0-9][A-Z0-9\s\.&]+?)(?:\s+(?:REF|ADR|SERV|COMP|OC|CONF|\d{2}\/)|\s*$)/i);
+    if(m){
+      name = m[1].trim().replace(/\s+[A-Z]$/,'').trim();
+      // Ignorar se parece CNPJ puro (só dígitos e pontos)
+      if(!/^[\d\.\-\/]+$/.test(name) && name.length > 1) return name;
+    }
+
+    // Padrão 2: "FORNECEDOR NOME" — COMP PA TITULO xxx FORNECEDOR NOME
+    m = s.match(/FORNECEDOR\s+([A-Z0-9][A-Z0-9\s\.&]+?)(?:\s*$)/i);
+    if(m) return m[1].trim().replace(/\s+[A-Z]$/,'').trim();
+
+    // Padrão 3: "- NOME REF" ou "- NOME " — PGTO.CF.CHQ. DOC. xxx - NOME REF
+    // ou VLR. REE xxx - NOME
+    const parts = s.split(/\s+-\s+/);
+    if(parts.length >= 2){
+      name = parts[parts.length-1].trim();
+      // Remove número da NF colado no início (sem espaço): "BX REF NF -
+      // 000001501-CPFL RENOVAVEIS" cai aqui com name="000001501-CPFL
+      // RENOVAVEIS" — sem isso o nome ficava com o número da NF na frente,
+      // diferente do lado do débito (que extrai só "CPFL RENOVAVEIS").
+      name = name.replace(/^0*\d{3,}-/,'').trim();
+      // Remove referência a várias NFs no final: "FOUR TECH NFS 266 267 E
+      // 268" → "FOUR TECH" (a lista de NFs não faz parte do nome).
+      name = name.replace(/\s+NFS?\s+\d+(?:[\s,]+(?:E\s+)?\d+)+\s*$/i,'').trim();
+      // Remove sufixos comuns
+      name = name.replace(/\s+(REF|SERV|MAT|COMP|OC|CONF)\.?.*$/i,'').trim();
+      name = name.replace(/\s+[A-Z]$/,'').trim();
+      if(name && !/^[\d\.\-\/]+$/.test(name) && name.length > 1) return name;
+    }
+
+    // Padrão 4: texto após último espaço-hífen em históricos com "DO FORNECEDOR NOME"
+    m = s.match(/DO\s+FORNECEDOR\s+([A-Z0-9][A-Z0-9\s]+?)(?:\s*$)/i);
+    if(m) return m[1].trim();
   }
-
-  // Padrão 2: "FORNECEDOR NOME" — COMP PA TITULO xxx FORNECEDOR NOME
-  m = s.match(/FORNECEDOR\s+([A-Z0-9][A-Z0-9\s\.&]+?)(?:\s*$)/i);
-  if(m) return m[1].trim().replace(/\s+[A-Z]$/,'').trim();
-
-  // Padrão 3: "- NOME REF" ou "- NOME " — PGTO.CF.CHQ. DOC. xxx - NOME REF
-  // ou VLR. REE xxx - NOME
-  const parts = s.split(/\s+-\s+/);
-  if(parts.length >= 2){
-    name = parts[parts.length-1].trim();
-    // Remove número da NF colado no início (sem espaço): "BX REF NF -
-    // 000001501-CPFL RENOVAVEIS" cai aqui com name="000001501-CPFL
-    // RENOVAVEIS" — sem isso o nome ficava com o número da NF na frente,
-    // diferente do lado do débito (que extrai só "CPFL RENOVAVEIS").
-    name = name.replace(/^0*\d{3,}-/,'').trim();
-    // Remove referência a várias NFs no final: "FOUR TECH NFS 266 267 E
-    // 268" → "FOUR TECH" (a lista de NFs não faz parte do nome).
-    name = name.replace(/\s+NFS?\s+\d+(?:[\s,]+(?:E\s+)?\d+)+\s*$/i,'').trim();
-    // Remove sufixos comuns
-    name = name.replace(/\s+(REF|SERV|MAT|COMP|OC|CONF)\.?.*$/i,'').trim();
-    name = name.replace(/\s+[A-Z]$/,'').trim();
-    if(name && !/^[\d\.\-\/]+$/.test(name) && name.length > 1) return name;
-  }
-
-  // Padrão 4: texto após último espaço-hífen em históricos com "DO FORNECEDOR NOME"
-  m = s.match(/DO\s+FORNECEDOR\s+([A-Z0-9][A-Z0-9\s]+?)(?:\s*$)/i);
-  if(m) return m[1].trim();
 
   return '';
 }
