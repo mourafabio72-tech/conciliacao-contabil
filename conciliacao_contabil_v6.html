@@ -1644,6 +1644,37 @@ function classifyAll(tx){
     // Lançamentos sem NF podem casar por valor (compensação genérica).
     // ───────────────────────────────────────────────────────────────────────
 
+    // 0. Pagamento/recebimento que referencia VÁRIAS NFs no próprio
+    // histórico (ex.: "PGTO REF 24141375 - - - FOUR TECH NFS 266 267 E
+    // 268" liquidando 3 títulos de uma vez). Tem que rodar ANTES do passo
+    // 1 (match por NF simples) — senão o passo 1 já "rouba" a primeira NF
+    // citada (266) comparando sozinha contra o pagamento inteiro, acha
+    // diferença grande e marca como 'partial' errado, deixando a NF sem
+    // status 'open' antes desta regra ter a chance de rodar. Diferente da
+    // compensação unificada (passo 3, abaixo) — que busca uma soma
+    // coincidente por VALOR entre itens sem NF — aqui a ligação é
+    // explícita: o próprio histórico cita quais NFs estão sendo pagas.
+    items.filter(t => t.status==='open').forEach(t=>{
+      const nfsRef = exNFMultiplas(t.historico);
+      if(nfsRef.length < 2) return;
+      const ladoT = t.debito>0 ? 'debito' : 'credito';
+      const ladoOposto = ladoT==='debito' ? 'credito' : 'debito';
+      const valorT = t[ladoT];
+      const candidatos = items.filter(o=>
+        o!==t && o.status==='open' && o[ladoOposto]>0 && o.nf && nfsRef.includes(o.nf)
+      );
+      if(!candidatos.length) return;
+      const somaCand = candidatos.reduce((s,o)=>s+o[ladoOposto],0);
+      if(Math.abs(somaCand-valorT) < 0.02){
+        const detalhe = 'NFs '+nfsRef.join(', ');
+        t.status='match'; t.saldo_aberto=0; t.match_status='Pagto agrupado — '+detalhe;
+        candidatos.forEach(o=>{ o.status='match'; o.saldo_aberto=0; o.match_status='Pagto agrupado — ref. NF '+(t.nf||nfsRef[0]); });
+        pares.push({tipo:'match',data_nf:candidatos[0].data,data_rec:t.data,nf_num:nfsRef.join('/'),
+          razao:t.razao_social||candidatos[0].razao_social,conta:t.conta_cod,
+          vl_nf:somaCand,vl_rec:valorT,diferenca:0,pct:0});
+      }
+    });
+
     // 1. Match por NF exata: agrupa débitos e créditos por NF (uma NF pode
     // ter várias linhas — ex. NF SAIDA com entrega parcial + complemento) e
     // compara o TOTAL do grupo, não linha a linha. Sem agrupar, 2 débitos da
@@ -1721,36 +1752,6 @@ function classifyAll(tx){
         g.creds.forEach(t=>{ t.status='match'; t.saldo_aberto=0; });
         pares.push({tipo:'partial',data_nf:g.debs[0].data,data_rec:g.creds[0].data,nf_num:g.nf,
           razao,conta:g.debs[0].conta_cod,vl_nf:g.totDeb,vl_rec:g.totCred,diferenca:diff,pct});
-      }
-    });
-
-    // 1b. Pagamento/recebimento que referencia VÁRIAS NFs no próprio
-    // histórico (ex.: "PGTO REF 24141375 - - - FOUR TECH NFS 266 267 E
-    // 268" liquidando 3 títulos de uma vez). Diferente da compensação
-    // unificada (passo 3, abaixo) — que busca uma soma coincidente por
-    // VALOR entre itens sem NF — aqui a ligação é explícita: o próprio
-    // histórico cita quais NFs estão sendo pagas, então soma os
-    // lançamentos do lado oposto com QUALQUER uma dessas NFs e compara.
-    // Roda antes do passo 2 pra esses lançamentos não ficarem 'open' por
-    // não terem achado par 1:1 no passo 1.
-    items.filter(t => t.status==='open').forEach(t=>{
-      const nfsRef = exNFMultiplas(t.historico);
-      if(nfsRef.length < 2) return;
-      const ladoT = t.debito>0 ? 'debito' : 'credito';
-      const ladoOposto = ladoT==='debito' ? 'credito' : 'debito';
-      const valorT = t[ladoT];
-      const candidatos = items.filter(o=>
-        o!==t && o.status==='open' && o[ladoOposto]>0 && o.nf && nfsRef.includes(o.nf)
-      );
-      if(!candidatos.length) return;
-      const somaCand = candidatos.reduce((s,o)=>s+o[ladoOposto],0);
-      if(Math.abs(somaCand-valorT) < 0.02){
-        const detalhe = 'NFs '+nfsRef.join(', ');
-        t.status='match'; t.saldo_aberto=0; t.match_status='Pagto agrupado — '+detalhe;
-        candidatos.forEach(o=>{ o.status='match'; o.saldo_aberto=0; o.match_status='Pagto agrupado — ref. NF '+(t.nf||nfsRef[0]); });
-        pares.push({tipo:'match',data_nf:candidatos[0].data,data_rec:t.data,nf_num:nfsRef.join('/'),
-          razao:t.razao_social||candidatos[0].razao_social,conta:t.conta_cod,
-          vl_nf:somaCand,vl_rec:valorT,diferenca:0,pct:0});
       }
     });
 
