@@ -1201,21 +1201,30 @@ function exNF(h){
   // NF SAIDA 1  -000007319-COMPANHIA METALUR, NF SAIDA 001-00000...-NOME)
   m = s.match(/NF\s+SAIDA\s+\d+\s*-\s*0*(\d{4,})/i);
   if(m) return String(parseInt(m[1],10));
-  // 0b. NFS/RPS <num>, com ou sem "SAIDA" no meio — formato SEM código de
-  // filial, número direto (não tem padding de zeros nem o segundo grupo de
-  // dígitos do padrão 0): "NFS SAIDA 766 - RAIZEN ENERGIA S.A", "RPS SAIDA
-  // 777 - MILETOT", "VLR INSS RET. REF NFS 3 - SHOPPING FASHI" (retenção
-  // referenciando a NFS), "NFS SAIDA 765 UOL - PAGSEGURO" (token extra
-  // entre o número e o hífen — por isso não exige hífen logo depois, só
-  // fim de número). Checado depois do padrão 0 — senão capturaria errado
-  // o código de filial da "NF SAIDA 001-..." em vez do número da NF.
-  m = s.match(/(?:NFS?|RPS)[\s\/]+(?:SAIDA\s+)?0*(\d+)\b/i);
+  // 0b. NFS/RPS/SPED <num>, com ou sem "SAIDA" no meio — formato SEM código
+  // de filial, número direto (não tem padding de zeros nem o segundo grupo
+  // de dígitos do padrão 0): "NFS SAIDA 766 - RAIZEN ENERGIA S.A", "RPS
+  // SAIDA 777 - MILETOT", "VLR INSS RET. REF NFS 3 - SHOPPING FASHI"
+  // (retenção referenciando a NFS), "NFS SAIDA 765 UOL - PAGSEGURO" (token
+  // extra entre o número e o hífen — por isso não exige hífen logo depois,
+  // só fim de número), "SPED/000000264  FOUR/TECH" (outro código de
+  // documento do Protheus, mesma função de NF nesse layout). Checado
+  // depois do padrão 0 — senão capturaria errado o código de filial da
+  // "NF SAIDA 001-..." em vez do número da NF.
+  m = s.match(/(?:NFS?|RPS|SPED)[\s\/]+(?:SAIDA\s+)?0*(\d+)\b/i);
   if(m) return String(parseInt(m[1],10));
   // 1. NF seguido de ponto e dígitos: NF.000249, VL.NF.000204
   m = s.match(/NF\.0*(\d+)/i);
   if(m) return String(parseInt(m[1],10));
   // 2. NF nº 000xxx  ou  nf nº 000xxx  (com "nº" ou "no")
   m = s.match(/NF\s+n[oº°]?\.?\s*0*(\d+)/i);
+  if(m) return String(parseInt(m[1],10));
+  // 2b. NF-<lote/borderô>-<numero real>-<nome>: "BX REF NF-061-000000264-
+  // FOUR/TECH" — o primeiro número depois de "NF-" é referência de lote/
+  // borderô (curto, sem padding), o segundo é a NF de verdade (zero-
+  // padded, 3+ dígitos). Checado ANTES do padrão 3 (mais genérico),
+  // senão pegava só o primeiro número (o lote, errado).
+  m = s.match(/NF(?:\s*-)+\s*\d+(?:\s*-)+\s*0*(\d{3,})/i);
   if(m) return String(parseInt(m[1],10));
   // 3. NF - 000xxx  (CANC.PGTO.NF - 000000069). Tolera mais de um hífen
   // colado ("BX REF NF--000000244-SBV SERVICOS") com (?:\s*-)+.
@@ -1235,6 +1244,19 @@ function exNF(h){
   if(m) return String(parseInt(m[1],10));
   return '';
 }
+
+// Lista de NFs quando o histórico referencia VÁRIAS de uma vez — ex.: um
+// único pagamento que liquida 3 títulos juntos: "PGTO REF 24141375 - - -
+// FOUR TECH NFS 266 267 E 268". exNF() devolve só a primeira (266); esta
+// função devolve as 3 ([266,267,268]), usada em classifyAll pra tentar
+// casar a soma dos lançamentos do lado oposto com essas NFs específicas.
+function exNFMultiplas(h){
+  if(!h) return [];
+  const m = String(h).match(/NFS?\s+(\d+(?:[\s,]+(?:E\s+)?\d+)+)/i);
+  if(!m) return [];
+  return (m[1].match(/\d+/g)||[]).map(n=>String(parseInt(n,10)));
+}
+
 function exRS(h){
   if(!h) return '';
   const s = String(h);
@@ -1248,16 +1270,32 @@ function exRS(h){
     if(name && !/^[\d\.\-\/]+$/.test(name) && name.length > 1) return name;
   }
 
-  // Padrão 0b: NF/NFS/RPS seguido de separador qualquer (espaço, barra ou
+  // Padrão 0b: NF-<lote/borderô>-<numero real>-<nome> — mesma família do
+  // padrão 2b do exNF; pega o nome depois do SEGUNDO número (o primeiro é
+  // referência de lote/borderô, não faz parte do nome). Checado antes do
+  // padrão 0c (mais genérico, só 1 número), senão esse pegaria o nome
+  // errado a partir do PRIMEIRO número.
+  m = s.match(/NF(?:\s*-)+\s*\d+(?:\s*-)+\s*0*\d{3,}[\s\/-]+(.+)$/i);
+  if(m){
+    name = m[1].trim();
+    if(name && !/^[\d\.\-\/]+$/.test(name) && name.length > 1) return name;
+  }
+
+  // Padrão 0c: NF/NFS/RPS seguido de separador qualquer (espaço, barra ou
   // hífen — em qualquer quantidade dos dois lados) e número, com o nome
   // logo depois: "NFS/000000244  SBV SERVICOS" (barra), "BX REF NF--
   // 000000244-SBV SERVICOS" (hífen duplo colado). Mais geral que o padrão
   // 3 abaixo, que só separa por " - " (espaço-hífen-espaço) — aqui não
-  // exige espaço nenhum ao redor do separador.
-  m = s.match(/(?:NFS?|RPS)[\s\/-]+0*\d+[\s\/-]+(.+)$/i);
-  if(m){
-    name = m[1].trim();
-    if(name && !/^[\d\.\-\/]+$/.test(name) && name.length > 1) return name;
+  // exige espaço nenhum ao redor do separador. Pulado quando o histórico
+  // referencia VÁRIAS NFs (ex.: "NFS 266 267 E 268") — nesse caso captura
+  // só os números seguintes como se fossem nome; o padrão 3 mais abaixo
+  // (que olha o texto antes da NF, não depois) resolve melhor.
+  if(exNFMultiplas(s).length < 2){
+    m = s.match(/(?:NFS?|RPS|SPED)[\s\/-]+0*\d+[\s\/-]+(.+)$/i);
+    if(m){
+      name = m[1].trim();
+      if(name && !/^[\d\.\-\/]+$/.test(name) && name.length > 1) return name;
+    }
   }
 
   // Padrão 1: "... DE NOME ..." — usado em VLR.REF.A NF.xxx DE NOME e CANC.PGTO.NF - xxx DE NOME
@@ -1282,6 +1320,9 @@ function exRS(h){
     // RENOVAVEIS" — sem isso o nome ficava com o número da NF na frente,
     // diferente do lado do débito (que extrai só "CPFL RENOVAVEIS").
     name = name.replace(/^0*\d{3,}-/,'').trim();
+    // Remove referência a várias NFs no final: "FOUR TECH NFS 266 267 E
+    // 268" → "FOUR TECH" (a lista de NFs não faz parte do nome).
+    name = name.replace(/\s+NFS?\s+\d+(?:[\s,]+(?:E\s+)?\d+)+\s*$/i,'').trim();
     // Remove sufixos comuns
     name = name.replace(/\s+(REF|SERV|MAT|COMP|OC|CONF)\.?.*$/i,'').trim();
     name = name.replace(/\s+[A-Z]$/,'').trim();
@@ -1680,6 +1721,36 @@ function classifyAll(tx){
         g.creds.forEach(t=>{ t.status='match'; t.saldo_aberto=0; });
         pares.push({tipo:'partial',data_nf:g.debs[0].data,data_rec:g.creds[0].data,nf_num:g.nf,
           razao,conta:g.debs[0].conta_cod,vl_nf:g.totDeb,vl_rec:g.totCred,diferenca:diff,pct});
+      }
+    });
+
+    // 1b. Pagamento/recebimento que referencia VÁRIAS NFs no próprio
+    // histórico (ex.: "PGTO REF 24141375 - - - FOUR TECH NFS 266 267 E
+    // 268" liquidando 3 títulos de uma vez). Diferente da compensação
+    // unificada (passo 3, abaixo) — que busca uma soma coincidente por
+    // VALOR entre itens sem NF — aqui a ligação é explícita: o próprio
+    // histórico cita quais NFs estão sendo pagas, então soma os
+    // lançamentos do lado oposto com QUALQUER uma dessas NFs e compara.
+    // Roda antes do passo 2 pra esses lançamentos não ficarem 'open' por
+    // não terem achado par 1:1 no passo 1.
+    items.filter(t => t.status==='open').forEach(t=>{
+      const nfsRef = exNFMultiplas(t.historico);
+      if(nfsRef.length < 2) return;
+      const ladoT = t.debito>0 ? 'debito' : 'credito';
+      const ladoOposto = ladoT==='debito' ? 'credito' : 'debito';
+      const valorT = t[ladoT];
+      const candidatos = items.filter(o=>
+        o!==t && o.status==='open' && o[ladoOposto]>0 && o.nf && nfsRef.includes(o.nf)
+      );
+      if(!candidatos.length) return;
+      const somaCand = candidatos.reduce((s,o)=>s+o[ladoOposto],0);
+      if(Math.abs(somaCand-valorT) < 0.02){
+        const detalhe = 'NFs '+nfsRef.join(', ');
+        t.status='match'; t.saldo_aberto=0; t.match_status='Pagto agrupado — '+detalhe;
+        candidatos.forEach(o=>{ o.status='match'; o.saldo_aberto=0; o.match_status='Pagto agrupado — ref. NF '+(t.nf||nfsRef[0]); });
+        pares.push({tipo:'match',data_nf:candidatos[0].data,data_rec:t.data,nf_num:nfsRef.join('/'),
+          razao:t.razao_social||candidatos[0].razao_social,conta:t.conta_cod,
+          vl_nf:somaCand,vl_rec:valorT,diferenca:0,pct:0});
       }
     });
 
