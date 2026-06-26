@@ -1654,14 +1654,29 @@ function classifyAll(tx){
     // compensação unificada (passo 3, abaixo) — que busca uma soma
     // coincidente por VALOR entre itens sem NF — aqui a ligação é
     // explícita: o próprio histórico cita quais NFs estão sendo pagas.
+    // Mesma proteção contra colisão de NF do passo 1 (ver comentário mais
+    // abaixo, no agrupamento por NF): números de NF/RPS baixos (ex.: 266,
+    // 267, 268) podem coincidir por acaso com a NF de OUTRO fornecedor na
+    // mesma conta de "FORNEC NACIONAIS" — sem checar o nome, a soma dos
+    // candidatos incluiria um lançamento estranho, a soma nunca bateria e
+    // o pagamento agrupado inteiro ficaria preso em 'open' para sempre.
+    // Normaliza removendo TODA pontuação/separador (não só maiúsculas/trim):
+    // o histórico de débito do Protheus costuma vir "FOUR TECH" (espaço) e o
+    // de crédito "FOUR/TECH" (barra) para o MESMO fornecedor — comparar só
+    // por substring sem remover esses separadores reprova a comparação por
+    // diferenças de espaço vs. barra/hífen, mesmo sendo o nome idêntico.
+    // Reaproveitado no passo 1 (grupo()), mesma necessidade ali.
+    const normNome = s => String(s||'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
     items.filter(t => t.status==='open').forEach(t=>{
       const nfsRef = exNFMultiplas(t.historico);
       if(nfsRef.length < 2) return;
       const ladoT = t.debito>0 ? 'debito' : 'credito';
       const ladoOposto = ladoT==='debito' ? 'credito' : 'debito';
       const valorT = t[ladoT];
+      const nomeT = normNome(t.razao_social);
       const candidatos = items.filter(o=>
-        o!==t && o.status==='open' && o[ladoOposto]>0 && o.nf && nfsRef.includes(o.nf)
+        o!==t && o.status==='open' && o[ladoOposto]>0 && o.nf && nfsRef.includes(o.nf) &&
+        (!nomeT || !o.razao_social || normNome(o.razao_social).includes(nomeT) || nomeT.includes(normNome(o.razao_social)))
       );
       if(!candidatos.length) return;
       const somaCand = candidatos.reduce((s,o)=>s+o[ladoOposto],0);
@@ -1703,8 +1718,8 @@ function classifyAll(tx){
     // gruposPorNF[nf] = lista de grupos daquela NF (normalmente só 1; mais de
     // 1 só quando a mesma NF aparece pra contrapartes com nomes diferentes
     // — busca escopada a essa lista, não a todos os grupos do arquivo, pra
-    // não pesar em razões com muitas NFs distintas.
-    const normNome = s => String(s||'').toUpperCase().trim();
+    // não pesar em razões com muitas NFs distintas. normNome() já foi
+    // definida no passo 0, acima — mesma função, reaproveitada aqui.
     const gruposPorNF = {};
     function grupo(t){
       const nome = normNome(t.razao_social);
