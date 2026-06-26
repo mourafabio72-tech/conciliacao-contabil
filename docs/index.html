@@ -1411,6 +1411,19 @@ function processWS_dominio(ws){
 function processWS(ws){
   setP(40,'Mapeando contas...');
   const range=XLSX.utils.decode_range(ws['!ref']);
+  // O range declarado em '!ref' pode ficar desatualizado/menor que os dados
+  // reais em alguns arquivos (ex.: gerados por integração que não recalcula
+  // a dimensão da planilha) — isso corta silenciosamente as ÚLTIMAS linhas
+  // do arquivo, sem erro nenhum (o loop abaixo simplesmente não chega lá).
+  // Recalcula o limite real varrendo as células que de fato existem no
+  // worksheet, em vez de confiar só no '!ref' declarado.
+  let maxRow = range.e.r;
+  for (const addr in ws) {
+    if (addr.charCodeAt(0) === 33) continue; // pula chaves de metadado ('!ref', '!margins'...)
+    const rr = XLSX.utils.decode_cell(addr).r;
+    if (rr > maxRow) maxRow = rr;
+  }
+  if (maxRow > range.e.r) range.e.r = maxRow;
   let cc=null,cd=''; const tx=[];
   for(let r=range.s.r;r<=range.e.r;r++){
     const c0=ws[XLSX.utils.encode_cell({r,c:0})];if(!c0)continue;
